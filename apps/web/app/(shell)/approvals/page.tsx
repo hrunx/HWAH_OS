@@ -1,12 +1,12 @@
 export const runtime = "nodejs";
 
-export default function ApprovalsPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Approvals</h1>
-      <p className="text-sm text-muted-foreground">Coming soon.</p>
-    </div>
-  );
+import { getSession } from "@/lib/auth/get-session";
+import { ApprovalsPageClient } from "@/components/approvals/approvals-page";
+
+export default async function ApprovalsPage() {
+  const session = await getSession();
+  if (!session) return null;
+  return <ApprovalsPageClient companyId={session.companyId} />;
 }
 
 
