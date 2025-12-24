@@ -13,6 +13,7 @@
     "@pa-os/agents": "workspace:*",
     "@pa-os/db": "workspace:*",
     "bullmq": "^5.31.1",
+    "drizzle-orm": "^0.36.4",
     "dotenv": "^16.4.7",
     "ioredis": "^5.4.1",
     "pino": "^9.5.0",

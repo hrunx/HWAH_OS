@@ -9,9 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/interaction": "^6.1.15",
+    "@fullcalendar/react": "^6.1.15",
+    "@fullcalendar/timegrid": "^6.1.15",
     "@pa-os/db": "workspace:*",
     "@pa-os/ui": "workspace:*",
+    "bullmq": "^5.31.1",
     "drizzle-orm": "^0.36.4",
+    "ioredis": "^5.4.1",
     "jose": "^5.9.6",
     "lucide-react": "^0.468.0",
     "next": "16.1.1",
