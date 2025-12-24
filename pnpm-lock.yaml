@@ -44,6 +44,9 @@ importers:
       '@fullcalendar/timegrid':
         specifier: ^6.1.15
         version: 6.1.20(@fullcalendar/core@6.1.20)
+      '@pa-os/agents':
+        specifier: workspace:*
+        version: link:../../packages/agents
       '@pa-os/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -157,12 +160,21 @@ importers:
 
   packages/agents:
     dependencies:
+      '@langchain/core':
+        specifier: ^0.3.80
+        version: 0.3.80(openai@4.104.0(zod@3.25.76))
       '@langchain/langgraph':
         specifier: ^0.4.7
         version: 0.4.9(@langchain/core@0.3.80(openai@4.104.0(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod-to-json-schema@3.25.0(zod@3.25.76))
+      '@langchain/langgraph-checkpoint':
+        specifier: ^0.1.1
+        version: 0.1.1(@langchain/core@0.3.80(openai@4.104.0(zod@3.25.76)))
       '@pa-os/db':
         specifier: workspace:*
         version: link:../db
+      drizzle-orm:
+        specifier: ^0.36.4
+        version: 0.36.4(@types/react@19.2.7)(postgres@3.4.7)(react@19.2.3)
       openai:
         specifier: ^4.76.3
         version: 4.104.0(zod@3.25.76)

@@ -4,7 +4,22 @@
   "tasks": {
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": [
+        "DATABASE_URL",
+        "REDIS_URL",
+        "APP_URL",
+        "TOKEN_ENC_KEY",
+        "LOCAL_ADMIN_PASSWORD",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REDIRECT_URI",
+        "OPENAI_API_KEY",
+        "OPENAI_REALTIME_MODEL",
+        "OPENAI_TRANSCRIPTION_MODEL",
+        "COPILOTKIT_PUBLIC_NAME",
+        "COPILOTKIT_AGENT_ROUTE"
+      ]
     },
     "build": {
       "dependsOn": ["^build"],

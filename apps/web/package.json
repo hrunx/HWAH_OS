@@ -13,6 +13,7 @@
     "@fullcalendar/interaction": "^6.1.15",
     "@fullcalendar/react": "^6.1.15",
     "@fullcalendar/timegrid": "^6.1.15",
+    "@pa-os/agents": "workspace:*",
     "@pa-os/db": "workspace:*",
     "@pa-os/ui": "workspace:*",
     "bullmq": "^5.31.1",

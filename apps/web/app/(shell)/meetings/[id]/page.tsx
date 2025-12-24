@@ -1,11 +1,43 @@
 export const runtime = "nodejs";
 
-export default function MeetingDetailPage() {
+import { redirect } from "next/navigation";
+import { and, eq } from "drizzle-orm";
+import { getDb } from "@pa-os/db";
+import { meetings } from "@pa-os/db/schema";
+
+import { getSession } from "@/lib/auth/get-session";
+import { MeetingRoom } from "@/components/meetings/meeting-room";
+
+export default async function MeetingDetailPage({ params }: { params: { id: string } }) {
+  const session = await getSession();
+  if (!session) return null;
+
+  const { db } = getDb();
+  const [meeting] = await db
+    .select({
+      id: meetings.id,
+      title: meetings.title,
+      startsAt: meetings.startsAt,
+      endsAt: meetings.endsAt,
+      state: meetings.state,
+    })
+    .from(meetings)
+    .where(and(eq(meetings.id, params.id), eq(meetings.companyId, session.companyId)))
+    .limit(1);
+
+  if (!meeting) redirect("/meetings");
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Meeting</h1>
-      <p className="text-sm text-muted-foreground">Coming soon.</p>
-    </div>
+    <MeetingRoom
+      companyId={session.companyId}
+      meeting={{
+        id: meeting.id,
+        title: meeting.title,
+        startsAt: meeting.startsAt.toISOString(),
+        endsAt: meeting.endsAt.toISOString(),
+        state: meeting.state,
+      }}
+    />
   );
 }
 

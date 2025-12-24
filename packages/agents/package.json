@@ -11,8 +11,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@langchain/core": "^0.3.80",
+    "@langchain/langgraph-checkpoint": "^0.1.1",
     "@langchain/langgraph": "^0.4.7",
     "@pa-os/db": "workspace:*",
+    "drizzle-orm": "^0.36.4",
     "openai": "^4.76.3",
     "zod": "^3.24.1"
   },
