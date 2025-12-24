@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: paos-postgres
+    environment:
+      POSTGRES_DB: paos
+      POSTGRES_USER: paos
+      POSTGRES_PASSWORD: paos
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18+ stores data under a major-version subdir; mount the parent directory.
+      # Use a fresh volume name to avoid any legacy /var/lib/postgresql/data layout.
+      - paos_pgdata_v2:/var/lib/postgresql
+
+  redis:
+    image: redis:latest
+    container_name: paos-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  paos_pgdata_v2:
+
+
