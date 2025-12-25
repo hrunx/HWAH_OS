@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
 import { companies, memberships } from "@pa-os/db/schema";
+import { cookies } from "next/headers";
 
 import { getSession } from "@/lib/auth/get-session";
+import { VIEW_COMPANY_COOKIE_NAME } from "@/lib/auth/view-company";
 import { ShellLayout } from "@/components/shell/shell-layout";
 
 export const runtime = "nodejs";
@@ -27,8 +29,14 @@ export default async function ShellGroupLayout({ children }: { children: React.R
     redirect("/login");
   }
 
-  const activeCompanyId =
-    rows.find((c) => c.id === session.companyId)?.id ?? rows[0]!.id;
+  const viewCookie = (await cookies()).get(VIEW_COMPANY_COOKIE_NAME)?.value ?? null;
+  const canViewAll = viewCookie === "all";
+  const cookieCompany =
+    viewCookie && viewCookie !== "all" ? rows.find((c) => c.id === viewCookie)?.id ?? null : null;
+
+  const activeCompanyId = canViewAll
+    ? "all"
+    : cookieCompany ?? rows.find((c) => c.id === session.companyId)?.id ?? rows[0]!.id;
 
   return (
     <ShellLayout

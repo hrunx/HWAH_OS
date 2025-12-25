@@ -30,6 +30,8 @@ type CalendarEvent = {
   end: string;
   status: string;
   hangoutLink: string | null;
+  companyId?: string;
+  companyName?: string;
 };
 
 type TaskLite = { id: string; title: string; status: string; priority: string };
@@ -51,6 +53,7 @@ export function CalendarPageClient({
   events: CalendarEvent[];
   googleConnected: boolean;
 }) {
+  const isAll = companyId === "all";
   const router = useRouter();
   const [selected, setSelected] = React.useState<CalendarEvent | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
@@ -61,6 +64,10 @@ export function CalendarPageClient({
   const [startingMeeting, setStartingMeeting] = React.useState(false);
 
   async function manualSync() {
+    if (isAll) {
+      toast.error("Calendar sync is company-specific. Pick a company first.");
+      return;
+    }
     try {
       const res = await fetch("/api/integrations/google/calendar/sync");
       const json = (await res.json().catch(() => null)) as any;
@@ -89,6 +96,10 @@ export function CalendarPageClient({
 
   async function generatePrepPack() {
     if (!selected) return;
+    if (isAll) {
+      toast.error("Prep packs are company-specific. Pick a company first.");
+      return;
+    }
     setLoadingPrep(true);
     setPrepPack(null);
     try {
@@ -113,6 +124,10 @@ export function CalendarPageClient({
 
   async function startMeeting() {
     if (!selected) return;
+    if (isAll) {
+      toast.error("Starting meetings is company-specific. Pick a company first.");
+      return;
+    }
     setStartingMeeting(true);
     try {
       const res = await fetch("/api/meetings/create", {
@@ -138,7 +153,9 @@ export function CalendarPageClient({
           <p className="text-sm text-muted-foreground">FullCalendar backed by cached Google events.</p>
         </div>
         <div className="flex items-center gap-2">
-          {googleConnected ? (
+            {isAll ? (
+              <Badge variant="secondary">All companies (read-only)</Badge>
+            ) : googleConnected ? (
             <>
               <Badge variant="secondary">Google connected</Badge>
               <Button variant="secondary" onClick={manualSync}>
@@ -190,9 +207,12 @@ export function CalendarPageClient({
           <DialogHeader>
             <DialogTitle>{selected?.title ?? "Event"}</DialogTitle>
             <DialogDescription>
-              {selected
-                ? `${new Date(selected.start).toLocaleString()} → ${new Date(selected.end).toLocaleString()}`
-                : null}
+                {selected ? (
+                  <>
+                    {`${new Date(selected.start).toLocaleString()} → ${new Date(selected.end).toLocaleString()}`}
+                    {selected.companyName ? ` • ${selected.companyName}` : ""}
+                  </>
+                ) : null}
             </DialogDescription>
           </DialogHeader>
 

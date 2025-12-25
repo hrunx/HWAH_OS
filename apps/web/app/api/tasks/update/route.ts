@@ -5,6 +5,7 @@ import { getDb } from "@pa-os/db";
 import { tasks } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
+import { isCompanyMember } from "@/lib/auth/membership";
 
 export const runtime = "nodejs";
 
@@ -45,8 +46,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Task not found" }, { status: 404 });
   }
 
-  if (existing.companyId !== session.companyId) {
-    return NextResponse.json({ ok: false, error: "Wrong company" }, { status: 403 });
+  if (!(await isCompanyMember({ personId: session.personId, companyId: existing.companyId }))) {
+    return NextResponse.json({ ok: false, error: "No access to that company" }, { status: 403 });
   }
 
   const patch = parsed.data.patch;
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
   const [updated] = await db
     .update(tasks)
     .set(update)
-    .where(and(eq(tasks.id, parsed.data.taskId), eq(tasks.companyId, session.companyId)))
+    .where(and(eq(tasks.id, parsed.data.taskId), eq(tasks.companyId, existing.companyId)))
     .returning();
 
   return NextResponse.json({ ok: true, task: updated });

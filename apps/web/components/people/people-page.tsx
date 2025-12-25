@@ -23,9 +23,11 @@ type Person = {
   email: string;
   title: string | null;
   role: "OWNER" | "MEMBER";
+  companyName?: string | null;
 };
 
 export function PeoplePageClient({ companyId }: { companyId: string }) {
+  const isAll = companyId === "all";
   const [loading, setLoading] = React.useState(true);
   const [people, setPeople] = React.useState<Person[]>([]);
 
@@ -52,6 +54,10 @@ export function PeoplePageClient({ companyId }: { companyId: string }) {
   }, [companyId]);
 
   async function createPerson() {
+    if (isAll) {
+      toast.error("Adding people is company-specific. Pick a company first.");
+      return;
+    }
     try {
       const res = await fetch("/api/people/create", {
         method: "POST",
@@ -105,7 +111,7 @@ export function PeoplePageClient({ companyId }: { companyId: string }) {
                 <SelectItem value="OWNER">OWNER</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={createPerson} disabled={!fullName.trim() || !email.trim()}>
+            <Button onClick={createPerson} disabled={isAll || !fullName.trim() || !email.trim()}>
               Add
             </Button>
           </div>
@@ -127,6 +133,7 @@ export function PeoplePageClient({ companyId }: { companyId: string }) {
                     <div className="font-medium truncate">{p.fullName}</div>
                     <div className="text-xs text-muted-foreground truncate">
                       {p.email} {p.title ? `• ${p.title}` : ""} • {p.role}
+                      {isAll && p.companyName ? ` • ${p.companyName}` : ""}
                     </div>
                   </div>
                 </div>

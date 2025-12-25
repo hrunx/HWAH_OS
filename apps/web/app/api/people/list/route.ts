@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
-import { memberships, people } from "@pa-os/db/schema";
+import { companies, memberships, people } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
 
 export const runtime = "nodejs";
 
 const QuerySchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.union([z.string().uuid(), z.literal("all")]),
 });
 
 export async function GET(req: Request) {
@@ -22,11 +22,21 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid query" }, { status: 400 });
   }
 
-  if (parsed.data.companyId !== session.companyId) {
-    return NextResponse.json({ ok: false, error: "Wrong company" }, { status: 403 });
+  const { db } = getDb();
+  const allowedCompanyIds =
+    parsed.data.companyId === "all"
+      ? (
+          await db
+            .select({ companyId: memberships.companyId })
+            .from(memberships)
+            .where(eq(memberships.personId, session.personId))
+        ).map((r) => r.companyId)
+      : [parsed.data.companyId];
+
+  if (!allowedCompanyIds.length) {
+    return NextResponse.json({ ok: true, people: [] });
   }
 
-  const { db } = getDb();
   const rows = await db
     .select({
       id: people.id,
@@ -35,11 +45,25 @@ export async function GET(req: Request) {
       title: people.title,
       createdAt: people.createdAt,
       role: memberships.role,
+      companyId: memberships.companyId,
+      companyName: companies.name,
     })
     .from(memberships)
     .innerJoin(people, eq(memberships.personId, people.id))
-    .where(and(eq(memberships.companyId, parsed.data.companyId)))
+    .innerJoin(companies, eq(memberships.companyId, companies.id))
+    .where(inArray(memberships.companyId, allowedCompanyIds))
     .orderBy(people.fullName);
+
+  // If user is viewing "all", dedupe by personId (same person can be in multiple companies).
+  if (parsed.data.companyId === "all") {
+    const seen = new Set<string>();
+    const deduped = rows.filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+    return NextResponse.json({ ok: true, people: deduped });
+  }
 
   return NextResponse.json({ ok: true, people: rows });
 }

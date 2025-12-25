@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
-import { approvals } from "@pa-os/db/schema";
+import { approvals, companies, memberships } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
 
 export const runtime = "nodejs";
 
 const QuerySchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.union([z.string().uuid(), z.literal("all")]),
   status: z.string().optional(),
 });
 
@@ -27,21 +27,32 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid query" }, { status: 400 });
   }
 
-  if (parsed.data.companyId !== session.companyId) {
-    return NextResponse.json({ ok: false, error: "Wrong company" }, { status: 403 });
+  const { db } = getDb();
+  const allowedCompanyIds =
+    parsed.data.companyId === "all"
+      ? (
+          await db
+            .select({ companyId: memberships.companyId })
+            .from(memberships)
+            .where(eq(memberships.personId, session.personId))
+        ).map((r) => r.companyId)
+      : [parsed.data.companyId];
+
+  if (!allowedCompanyIds.length) {
+    return NextResponse.json({ ok: true, approvals: [] });
   }
 
-  const where = [eq(approvals.companyId, parsed.data.companyId)];
+  const where = [inArray(approvals.companyId, allowedCompanyIds)];
   const allowedStatus = new Set(["PENDING", "APPROVED", "REJECTED"]);
   if (parsed.data.status && allowedStatus.has(parsed.data.status)) {
     where.push(eq(approvals.status, parsed.data.status as any));
   }
 
-  const { db } = getDb();
   const rows = await db
     .select({
       id: approvals.id,
       companyId: approvals.companyId,
+      companyName: companies.name,
       agentRunId: approvals.agentRunId,
       type: approvals.type,
       status: approvals.status,
@@ -52,6 +63,7 @@ export async function GET(req: Request) {
       decidedAt: approvals.decidedAt,
     })
     .from(approvals)
+    .innerJoin(companies, eq(approvals.companyId, companies.id))
     .where(and(...where))
     .orderBy(desc(approvals.createdAt));
 

@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
-import { meetings } from "@pa-os/db/schema";
+import { companies, meetings, memberships } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
 
 export const runtime = "nodejs";
 
 const QuerySchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.union([z.string().uuid(), z.literal("all")]),
 });
 
 export async function GET(req: Request) {
@@ -22,11 +22,21 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid query" }, { status: 400 });
   }
 
-  if (parsed.data.companyId !== session.companyId) {
-    return NextResponse.json({ ok: false, error: "Wrong company" }, { status: 403 });
+  const { db } = getDb();
+  const allowedCompanyIds =
+    parsed.data.companyId === "all"
+      ? (
+          await db
+            .select({ companyId: memberships.companyId })
+            .from(memberships)
+            .where(eq(memberships.personId, session.personId))
+        ).map((r) => r.companyId)
+      : [parsed.data.companyId];
+
+  if (!allowedCompanyIds.length) {
+    return NextResponse.json({ ok: true, meetings: [] });
   }
 
-  const { db } = getDb();
   const rows = await db
     .select({
       id: meetings.id,
@@ -34,9 +44,12 @@ export async function GET(req: Request) {
       startsAt: meetings.startsAt,
       endsAt: meetings.endsAt,
       state: meetings.state,
+      companyId: meetings.companyId,
+      companyName: companies.name,
     })
     .from(meetings)
-    .where(eq(meetings.companyId, session.companyId))
+    .innerJoin(companies, eq(meetings.companyId, companies.id))
+    .where(inArray(meetings.companyId, allowedCompanyIds))
     .orderBy(desc(meetings.startsAt))
     .limit(50);
 

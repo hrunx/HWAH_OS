@@ -6,11 +6,12 @@ import { memberships } from "@pa-os/db/schema";
 import { cookies } from "next/headers";
 
 import { createSessionToken, SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth/session";
+import { VIEW_COMPANY_COOKIE_NAME } from "@/lib/auth/view-company";
 
 export const runtime = "nodejs";
 
 const BodySchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.union([z.string().uuid(), z.literal("all")]),
 });
 
 export async function POST(req: Request) {
@@ -28,6 +29,18 @@ export async function POST(req: Request) {
   const parsed = BodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: "Invalid body" }, { status: 400 });
+  }
+
+  // "All companies" is a view mode. Keep the auth session companyId as-is, just set the view cookie.
+  if (parsed.data.companyId === "all") {
+    const res = NextResponse.json({ ok: true });
+    res.cookies.set(VIEW_COMPANY_COOKIE_NAME, "all", {
+      httpOnly: false,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+    return res;
   }
 
   const { db } = getDb();
@@ -49,6 +62,12 @@ export async function POST(req: Request) {
   const res = NextResponse.json({ ok: true });
   res.cookies.set(SESSION_COOKIE_NAME, newToken, {
     httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+  res.cookies.set(VIEW_COMPANY_COOKIE_NAME, parsed.data.companyId, {
+    httpOnly: false,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",

@@ -46,6 +46,7 @@ import {
 type Task = {
   id: string;
   companyId: string;
+  companyName?: string | null;
   title: string;
   descriptionMd: string;
   status: "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE";
@@ -131,6 +132,7 @@ function formatDue(dueAt: Task["dueAt"]) {
 }
 
 export function TasksPageClient({ companyId }: { companyId: string }) {
+  const isAll = companyId === "all";
   const [view, setView] = React.useState<"list" | "kanban">("list");
   const [loading, setLoading] = React.useState(true);
   const [tasks, setTasks] = React.useState<Task[]>([]);
@@ -156,6 +158,14 @@ export function TasksPageClient({ companyId }: { companyId: string }) {
   });
 
   async function loadPeople() {
+    if (isAll) {
+      // People list in "all" mode is only used for filtering, not for assignment.
+      const res = await fetch(`/api/people/list?companyId=all`);
+      const json = (await res.json().catch(() => null)) as any;
+      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Failed to load people");
+      setPeople(json.people as Person[]);
+      return;
+    }
     const res = await fetch(`/api/people/list?companyId=${companyId}`);
     const json = (await res.json().catch(() => null)) as any;
     if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Failed to load people");
@@ -199,6 +209,10 @@ export function TasksPageClient({ companyId }: { companyId: string }) {
   }, [statusFilter, priorityFilter, ownerFilter, dueFilter]);
 
   function openNew() {
+    if (isAll) {
+      toast.error("Creating tasks is company-specific. Pick a company first.");
+      return;
+    }
     setEditing(null);
     setDraft({
       title: "",
@@ -212,6 +226,10 @@ export function TasksPageClient({ companyId }: { companyId: string }) {
   }
 
   function openEdit(t: Task) {
+    if (isAll) {
+      toast.error("Editing tasks is company-specific. Pick a company first.");
+      return;
+    }
     setEditing(t);
     const due = t.dueAt ? new Date(t.dueAt as any) : null;
     const dueAtLocal = due
@@ -363,7 +381,9 @@ export function TasksPageClient({ companyId }: { companyId: string }) {
           <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
           <p className="text-sm text-muted-foreground">List + kanban with assignments, due dates, priority.</p>
         </div>
-        <Button onClick={openNew}>New Task</Button>
+        <Button onClick={openNew} disabled={isAll}>
+          New Task
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -462,6 +482,7 @@ export function TasksPageClient({ companyId }: { companyId: string }) {
                           {t.title}
                         </button>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            {isAll ? <Badge variant="outline">{t.companyName ?? t.companyId}</Badge> : null}
                           <Badge variant="secondary">{t.status}</Badge>
                           <Badge variant="outline">{t.priority}</Badge>
                           <span>Owner: {t.ownerName ?? "—"}</span>

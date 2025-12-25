@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, eq, ilike, inArray, or } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
-import { people, tasks } from "@pa-os/db/schema";
+import { companies, memberships, people, tasks } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
 
 export const runtime = "nodejs";
 
 const QuerySchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.union([z.string().uuid(), z.literal("all")]),
   status: z.string().optional(),
   owner: z.string().uuid().optional(),
   q: z.string().optional(),
@@ -35,11 +35,27 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid query" }, { status: 400 });
   }
 
-  if (parsed.data.companyId !== session.companyId) {
-    return NextResponse.json({ ok: false, error: "Wrong company" }, { status: 403 });
+  const { db } = getDb();
+  const allowedCompanyIds =
+    parsed.data.companyId === "all"
+      ? (
+          await db
+            .select({ companyId: memberships.companyId })
+            .from(memberships)
+            .where(eq(memberships.personId, session.personId))
+        ).map((r) => r.companyId)
+      : [parsed.data.companyId];
+
+  if (!allowedCompanyIds.length) {
+    return NextResponse.json({ ok: true, tasks: [] });
   }
 
-  const whereParts = [eq(tasks.companyId, parsed.data.companyId)];
+  // If user asked for a specific company, enforce membership.
+  if (parsed.data.companyId !== "all" && !allowedCompanyIds.includes(parsed.data.companyId)) {
+    return NextResponse.json({ ok: false, error: "No access to that company" }, { status: 403 });
+  }
+
+  const whereParts = [inArray(tasks.companyId, allowedCompanyIds)];
 
   const allowedStatus = new Set(["TODO", "IN_PROGRESS", "BLOCKED", "DONE"]);
   if (parsed.data.status && allowedStatus.has(parsed.data.status)) {
@@ -63,11 +79,11 @@ export async function GET(req: Request) {
   const now = new Date();
   // For due filters we post-filter in-memory for simplicity (null-safe). The dataset is small locally.
 
-  const { db } = getDb();
   const rows = await db
     .select({
       id: tasks.id,
       companyId: tasks.companyId,
+      companyName: companies.name,
       projectId: tasks.projectId,
       title: tasks.title,
       descriptionMd: tasks.descriptionMd,
@@ -82,6 +98,7 @@ export async function GET(req: Request) {
       ownerName: people.fullName,
     })
     .from(tasks)
+    .innerJoin(companies, eq(tasks.companyId, companies.id))
     .leftJoin(people, eq(tasks.ownerPersonId, people.id))
     .where(and(...whereParts))
     .orderBy(tasks.dueAt, tasks.createdAt);

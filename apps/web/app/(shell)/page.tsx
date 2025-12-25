@@ -1,8 +1,9 @@
-import { and, eq, gte, lt, ne, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
-import { approvals, calendarEvents, tasks } from "@pa-os/db/schema";
+import { approvals, calendarEvents, memberships, tasks } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
+import { getViewCompanyId } from "@/lib/auth/view-company";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@pa-os/ui";
 import { DailyBriefCard } from "@/components/copilot/daily-brief-card";
 
@@ -13,6 +14,16 @@ export default async function DashboardPage() {
   if (!session) return null;
 
   const { db } = getDb();
+  const viewCompanyId = await getViewCompanyId(session);
+  const allowedCompanyIds =
+    viewCompanyId === "all"
+      ? (
+          await db
+            .select({ companyId: memberships.companyId })
+            .from(memberships)
+            .where(eq(memberships.personId, session.personId))
+        ).map((r) => r.companyId)
+      : [viewCompanyId];
 
   const now = new Date();
   const startOfToday = new Date(now);
@@ -25,7 +36,7 @@ export default async function DashboardPage() {
     .from(calendarEvents)
     .where(
       and(
-        eq(calendarEvents.companyId, session.companyId),
+        inArray(calendarEvents.companyId, allowedCompanyIds),
         gte(calendarEvents.startsAt, startOfToday),
         lt(calendarEvents.startsAt, endOfToday),
       ),
@@ -37,7 +48,7 @@ export default async function DashboardPage() {
     .from(tasks)
     .where(
       and(
-        eq(tasks.companyId, session.companyId),
+        inArray(tasks.companyId, allowedCompanyIds),
         ne(tasks.status, "DONE"),
         lt(tasks.dueAt, now),
       ),
@@ -46,14 +57,20 @@ export default async function DashboardPage() {
   const pendingApprovals = await db
     .select({ id: approvals.id })
     .from(approvals)
-    .where(and(eq(approvals.companyId, session.companyId), eq(approvals.status, "PENDING")));
+    .where(and(inArray(approvals.companyId, allowedCompanyIds), eq(approvals.status, "PENDING")));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
-          Company-scoped overview (companyId: <span className="font-mono">{session?.companyId}</span>)
+          {viewCompanyId === "all" ? (
+            <>All companies overview</>
+          ) : (
+            <>
+              Company-scoped overview (companyId: <span className="font-mono">{viewCompanyId}</span>)
+            </>
+          )}
         </p>
       </div>
 
@@ -88,7 +105,7 @@ export default async function DashboardPage() {
             <div className="mt-1 text-sm font-normal text-muted-foreground">Agent requests</div>
           </CardContent>
         </Card>
-        <DailyBriefCard companyId={session.companyId} />
+        <DailyBriefCard companyId={viewCompanyId === "all" ? session.companyId : viewCompanyId} />
       </div>
     </div>
   );

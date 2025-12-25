@@ -1,8 +1,9 @@
-import { and, eq, gte, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
-import { calendarEvents, integrations } from "@pa-os/db/schema";
+import { calendarEvents, companies, integrations, memberships } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
+import { getViewCompanyId } from "@/lib/auth/view-company";
 import { CalendarPageClient } from "@/components/calendar/calendar-page";
 
 export const runtime = "nodejs";
@@ -12,15 +13,31 @@ export default async function CalendarPage() {
   if (!session) return null;
 
   const { db } = getDb();
+  const viewCompanyId = await getViewCompanyId(session);
+  const allowedCompanyIds =
+    viewCompanyId === "all"
+      ? (
+          await db
+            .select({ companyId: memberships.companyId })
+            .from(memberships)
+            .where(eq(memberships.personId, session.personId))
+        ).map((r) => r.companyId)
+      : [viewCompanyId];
+
   const now = new Date();
   const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const end = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
-  const [googleIntegration] = await db
-    .select({ id: integrations.id })
-    .from(integrations)
-    .where(and(eq(integrations.companyId, session.companyId), eq(integrations.provider, "google")))
-    .limit(1);
+  const googleIntegration =
+    viewCompanyId === "all"
+      ? null
+      : (
+          await db
+            .select({ id: integrations.id })
+            .from(integrations)
+            .where(and(eq(integrations.companyId, viewCompanyId), eq(integrations.provider, "google")))
+            .limit(1)
+        )[0] ?? null;
 
   const events = await db
     .select({
@@ -30,11 +47,14 @@ export default async function CalendarPage() {
       endsAt: calendarEvents.endsAt,
       status: calendarEvents.status,
       hangoutLink: calendarEvents.hangoutLink,
+      companyId: calendarEvents.companyId,
+      companyName: companies.name,
     })
     .from(calendarEvents)
+    .innerJoin(companies, eq(calendarEvents.companyId, companies.id))
     .where(
       and(
-        eq(calendarEvents.companyId, session.companyId),
+        inArray(calendarEvents.companyId, allowedCompanyIds),
         gte(calendarEvents.startsAt, start),
         lt(calendarEvents.startsAt, end),
       ),
@@ -43,7 +63,7 @@ export default async function CalendarPage() {
 
   return (
     <CalendarPageClient
-      companyId={session.companyId}
+      companyId={viewCompanyId}
       googleConnected={Boolean(googleIntegration)}
       events={events.map((e) => ({
         id: e.id,
@@ -52,6 +72,8 @@ export default async function CalendarPage() {
         end: e.endsAt.toISOString(),
         status: e.status,
         hangoutLink: e.hangoutLink,
+        companyId: (e as any).companyId,
+        companyName: (e as any).companyName,
       }))}
     />
   );

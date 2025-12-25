@@ -57,12 +57,12 @@ Rules:
     >
       <div className="min-h-screen bg-background text-foreground">
         <div className="flex">
-          <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r lg:min-h-screen">
+          <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r lg:sticky lg:top-0 lg:h-screen lg:shrink-0">
             <div className="p-4 border-b">
               <div className="text-sm font-semibold tracking-tight">PA OS</div>
               <div className="text-xs text-muted-foreground">Local-first CEO OS</div>
             </div>
-            <nav className="flex-1 p-2">
+            <nav className="flex-1 p-2 overflow-y-auto">
               {NAV.map((item) => {
                 const active = pathname === item.href;
                 const Icon = item.icon;

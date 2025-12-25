@@ -25,7 +25,8 @@ export function CompanySwitcher({
   companies: CompanyOption[];
   activeCompanyId: string;
 }) {
-  const active = companies.find((c) => c.id === activeCompanyId) ?? companies[0];
+  const isAll = activeCompanyId === "all";
+  const active = isAll ? null : companies.find((c) => c.id === activeCompanyId) ?? companies[0];
   const [loading, setLoading] = React.useState(false);
 
   async function switchCompany(companyId: string) {
@@ -54,11 +55,12 @@ export function CompanySwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" className="justify-between gap-2 min-w-[200px]" disabled={loading}>
-          <span className="truncate">{active?.name ?? "Company"}</span>
+          <span className="truncate">{isAll ? "All companies" : active?.name ?? "Company"}</span>
           <ChevronsUpDown className="h-4 w-4 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[220px]">
+        <DropdownMenuItem onClick={() => switchCompany("all")}>All companies</DropdownMenuItem>
         {companies.map((c) => (
           <DropdownMenuItem key={c.id} onClick={() => switchCompany(c.id)}>
             {c.name}

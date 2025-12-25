@@ -3,9 +3,10 @@ export const runtime = "nodejs";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
-import { meetings } from "@pa-os/db/schema";
+import { companies, meetings, memberships } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
+import { getViewCompanyId } from "@/lib/auth/view-company";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@pa-os/ui";
 
 export default async function MeetingsPage() {
@@ -13,18 +14,38 @@ export default async function MeetingsPage() {
   if (!session) return null;
 
   const { db } = getDb();
-  const rows = await db
-    .select({
-      id: meetings.id,
-      title: meetings.title,
-      startsAt: meetings.startsAt,
-      endsAt: meetings.endsAt,
-      state: meetings.state,
-    })
-    .from(meetings)
-    .where(eq(meetings.companyId, session.companyId))
-    .orderBy(desc(meetings.startsAt))
-    .limit(50);
+  const viewCompanyId = await getViewCompanyId(session);
+  const rows =
+    viewCompanyId === "all"
+      ? await db
+          .select({
+            id: meetings.id,
+            title: meetings.title,
+            startsAt: meetings.startsAt,
+            endsAt: meetings.endsAt,
+            state: meetings.state,
+            companyName: companies.name,
+          })
+          .from(meetings)
+          .innerJoin(companies, eq(meetings.companyId, companies.id))
+          .innerJoin(memberships, eq(memberships.companyId, meetings.companyId))
+          .where(eq(memberships.personId, session.personId))
+          .orderBy(desc(meetings.startsAt))
+          .limit(50)
+      : await db
+          .select({
+            id: meetings.id,
+            title: meetings.title,
+            startsAt: meetings.startsAt,
+            endsAt: meetings.endsAt,
+            state: meetings.state,
+            companyName: companies.name,
+          })
+          .from(meetings)
+          .innerJoin(companies, eq(meetings.companyId, companies.id))
+          .where(eq(meetings.companyId, viewCompanyId))
+          .orderBy(desc(meetings.startsAt))
+          .limit(50);
 
   const grouped = rows.reduce<Record<string, typeof rows>>((acc, m) => {
     (acc[m.state] ??= []).push(m);
@@ -58,6 +79,7 @@ export default async function MeetingsPage() {
                     <div className="min-w-0">
                       <div className="font-medium truncate">{m.title}</div>
                       <div className="text-xs text-muted-foreground">
+                        {viewCompanyId === "all" ? `${(m as any).companyName} • ` : ""}
                         {new Date(m.startsAt).toLocaleString()} → {new Date(m.endsAt).toLocaleString()}
                       </div>
                     </div>

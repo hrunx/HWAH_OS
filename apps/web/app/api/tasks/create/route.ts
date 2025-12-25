@@ -4,6 +4,7 @@ import { getDb } from "@pa-os/db";
 import { tasks } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
+import { isCompanyMember } from "@/lib/auth/membership";
 
 export const runtime = "nodejs";
 
@@ -28,8 +29,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid body" }, { status: 400 });
   }
 
-  if (parsed.data.companyId !== session.companyId) {
-    return NextResponse.json({ ok: false, error: "Wrong company" }, { status: 403 });
+  if (!(await isCompanyMember({ personId: session.personId, companyId: parsed.data.companyId }))) {
+    return NextResponse.json({ ok: false, error: "No access to that company" }, { status: 403 });
   }
 
   const dueAt = parsed.data.dueAt ? new Date(parsed.data.dueAt) : undefined;

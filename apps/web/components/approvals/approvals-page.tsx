@@ -28,6 +28,7 @@ import {
 type Approval = {
   id: string;
   companyId: string;
+  companyName?: string | null;
   agentRunId: string;
   type: "CREATE_TASKS" | "UPDATE_TASKS";
   status: "PENDING" | "APPROVED" | "REJECTED";
@@ -74,6 +75,7 @@ function toLocalDatetimeInputValue(iso?: string) {
 }
 
 export function ApprovalsPageClient({ companyId }: { companyId: string }) {
+  const isAll = companyId === "all";
   const [loading, setLoading] = React.useState(true);
   const [status, setStatus] = React.useState<string>("PENDING");
   const [approvals, setApprovals] = React.useState<Approval[]>([]);
@@ -101,7 +103,7 @@ export function ApprovalsPageClient({ companyId }: { companyId: string }) {
 
   async function loadPeople() {
     try {
-      const res = await fetch(`/api/people/list?companyId=${companyId}`);
+      const res = await fetch(`/api/people/list?companyId=${isAll ? "all" : companyId}`);
       const json = (await res.json().catch(() => null)) as any;
       if (!res.ok || !json?.ok) return;
       setPeople((json.people as any[]).map((p) => ({ id: p.id, fullName: p.fullName })));
@@ -200,7 +202,10 @@ export function ApprovalsPageClient({ companyId }: { companyId: string }) {
                   <div className="min-w-0">
                     <CardTitle className="text-base">{a.type}</CardTitle>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {new Date(a.createdAt).toLocaleString()} • <span className="font-mono">{a.id}</span>
+                      {new Date(a.createdAt).toLocaleString()}
+                      {isAll ? ` • ${a.companyName ?? a.companyId}` : ""}
+                      {" • "}
+                      <span className="font-mono">{a.id}</span>
                     </div>
                   </div>
                   <Badge variant={a.status === "PENDING" ? "secondary" : a.status === "APPROVED" ? "default" : "destructive"}>
