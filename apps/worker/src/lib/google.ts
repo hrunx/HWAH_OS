@@ -1,4 +1,4 @@
-import { decryptString, encryptString } from "./crypto";
+import { decryptString, encryptString } from "./crypto.js";
 
 export type GoogleTokenBundle = {
   accessToken: string;

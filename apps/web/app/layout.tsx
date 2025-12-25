@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "@copilotkit/react-ui/styles.css";
 
 import { AppProviders } from "@/components/shell/app-providers";
 

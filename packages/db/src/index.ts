@@ -2,10 +2,10 @@ import "dotenv/config";
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
 
-import * as schema from "./schema";
+import * as schema from "./schema.js";
 
 export { schema };
-export { seedDb } from "./seed";
+export { seedDb } from "./seed.js";
 
 export type DbClient = ReturnType<typeof createDb>;
 

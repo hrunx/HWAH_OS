@@ -2,14 +2,14 @@ import "dotenv/config";
 import { and, eq } from "drizzle-orm";
 import { pathToFileURL } from "node:url";
 
-import { getDb } from ".";
+import { getDb } from "./index.js";
 import {
   companies,
   memberships,
   people,
   projects,
   tasks,
-} from "./schema";
+} from "./schema.js";
 
 export async function seedDb() {
   const { db } = getDb();
@@ -29,6 +29,7 @@ export async function seedDb() {
       set: { name: "HWAH", timezone: "America/Los_Angeles" },
     })
     .returning();
+  if (!hwah) throw new Error("Failed to upsert company: hwah");
 
   const [gasable] = await db
     .insert(companies)
@@ -43,6 +44,7 @@ export async function seedDb() {
       set: { name: "Gasable", timezone: "America/Los_Angeles" },
     })
     .returning();
+  if (!gasable) throw new Error("Failed to upsert company: gasable");
 
   const ownerEmail = "owner@pa-os.local";
   const [owner] = await db
@@ -58,6 +60,7 @@ export async function seedDb() {
       set: { fullName: "Owner", title: "Founder" },
     })
     .returning();
+  if (!owner) throw new Error("Failed to upsert owner user");
 
   const samplePeople = [
     { fullName: "Ava Chen", email: "ava@pa-os.local", title: "Ops" },
@@ -116,6 +119,7 @@ export async function seedDb() {
       .insert(projects)
       .values({ ...p, status: "ACTIVE", createdAt: now })
       .returning({ id: projects.id, companyId: projects.companyId, name: projects.name });
+    if (!inserted) throw new Error(`Failed to insert project: ${p.name}`);
     createdProjects.push(inserted);
   }
 
@@ -144,8 +148,7 @@ export async function seedDb() {
       { title: "Clean up task taxonomy", status: "DONE", priority: "LOW" },
     ] as const;
 
-    for (let i = 0; i < sampleTasks.length; i++) {
-      const t = sampleTasks[i];
+    for (const [i, t] of sampleTasks.entries()) {
       const dueAt =
         t.status !== "DONE" && i % 3 === 0 ? new Date(Date.now() + 86400000 * (i - 2)) : null;
 

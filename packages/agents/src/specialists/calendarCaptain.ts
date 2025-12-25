@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getOpenAI } from "../openai/client";
+import { getOpenAI } from "../openai/client.js";
 
 const OutputSchema = z.object({
   prep_pack: z.object({

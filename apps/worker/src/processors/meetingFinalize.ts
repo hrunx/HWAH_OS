@@ -51,6 +51,7 @@ export async function meetingFinalizeProcessor(job: Job) {
       updatedAt: now,
     })
     .returning({ id: agentRuns.id, threadId: agentRuns.threadId });
+  if (!run) throw new Error("Failed to create agent run");
 
   try {
     const result = await runPostMeetingGraph({

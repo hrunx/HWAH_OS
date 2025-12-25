@@ -3,8 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
 import { calendarChannels, calendarEvents, integrations } from "@pa-os/db/schema";
 
-import { decryptString } from "../lib/crypto";
-import { googleCalendarListEvents, refreshAccessTokenIfNeeded } from "../lib/google";
+import { decryptString } from "../lib/crypto.js";
+import { googleCalendarListEvents, refreshAccessTokenIfNeeded } from "../lib/google.js";
 
 type CalendarSyncJob = {
   integrationId: string;

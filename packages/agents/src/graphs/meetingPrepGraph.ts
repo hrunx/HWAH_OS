@@ -3,7 +3,7 @@ import { and, eq, ilike, or } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
 import { calendarEvents, tasks } from "@pa-os/db/schema";
 
-import { calendarCaptainGeneratePrepPack } from "../specialists/calendarCaptain";
+import { calendarCaptainGeneratePrepPack } from "../specialists/calendarCaptain.js";
 
 const MeetingPrepState = Annotation.Root({
   companyId: Annotation<string>(),

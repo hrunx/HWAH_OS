@@ -3,8 +3,8 @@ import { and, eq, desc } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
 import { approvals, meetingAssets, meetingOutputs, meetings, tasks, transcripts } from "@pa-os/db/schema";
 
-import { meetingScribeGenerate, type MeetingBookmark } from "../specialists/meetingScribe";
-import { PostgresCheckpointer } from "../langgraph/postgresCheckpointer";
+import { meetingScribeGenerate, type MeetingBookmark } from "../specialists/meetingScribe.js";
+import { PostgresCheckpointer } from "../langgraph/postgresCheckpointer.js";
 
 type CreateTasksPayload = {
   tasks: Array<{
@@ -110,6 +110,7 @@ export function getPostMeetingGraph() {
         })
         .returning({ id: approvals.id });
 
+      if (!approval) throw new Error("Failed to create approval");
       return { approvalId: approval.id, approvalPayload: payload };
     })
     .addNode("interrupt_wait_for_approval", async (state) => {

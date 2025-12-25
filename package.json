@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "pnpm@9.0.0",
   "scripts": {
+    "predev": "turbo run build --filter=@pa-os/db --filter=@pa-os/agents",
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
     "lint": "turbo run lint",

@@ -1,95 +1,114 @@
-# PA-OS
+# CEO OS (PA OS) — Local-first Personal Assistant Platform
 
-Personal Assistant OS monorepo powering multi-company task, meeting, and approval workflows.
+**CEO OS** is a local-first, production-minded PA system for running a company day-to-day: tasks, people, calendar, meetings (realtime transcription), and post‑meeting agent workflows with **human approvals**.
 
-## What’s inside
+This repo is a **pnpm + Turborepo** monorepo (all TypeScript) designed to run locally on macOS with **Docker (Postgres + Redis)**.
 
-- **apps/web**: Next.js (App Router) web UI + API routes.
-- **apps/worker**: background worker (BullMQ) for agent runs, approvals, and async jobs.
-- **packages/db**: Drizzle ORM schema, migrations, and database helpers.
-- **packages/agents**: agent logic and orchestration.
-- **packages/ui**: shared UI components.
+## What’s included (vertical slice)
 
-## Tech stack
+- **Phase 1 — Foundation**
+  - Multi-company workspace (company-scoped navigation + switching)
+  - People directory (basic CRUD)
+  - Tasks CRUD (status/priority/due dates; UI scaffolding)
+- **Phase 2 — Calendar**
+  - Google OAuth (Calendar read-only)
+  - Worker-based sync into Postgres cache
+  - FullCalendar UI (week/day/month views)
+  - Create meetings from calendar UI
+- **Phase 3 — Meeting room**
+  - “Start Meeting” UI
+  - Live transcript UI (client-side streaming hook + persist on finalize)
+  - Bookmark markers (persisted)
+  - Tiptap notes editor (saved to DB)
+- **Phase 4 — Post-meeting agent + approvals**
+  - LangGraph durable workflow (`postMeetingGraph`) with HITL `interrupt()`
+  - Approval Center UI (approve/reject)
+  - CopilotKit in-app chat (“Ask PA”) wired to `/api/copilotkit`
 
-- **Frontend**: Next.js 16, React 19, Tailwind CSS
-- **Backend**: Next.js API routes + background worker
-- **DB**: Postgres + Drizzle ORM
-- **Queue**: BullMQ + Redis
-- **Auth/Integrations**: Google Calendar OAuth (read-only)
-- **AI**: OpenAI (transcription + agent workflows)
+## Stack (non-negotiables)
 
-## Prerequisites
+- **Next.js (App Router) + TypeScript** (`apps/web`)
+- **TailwindCSS + shadcn/ui** (`packages/ui`)
+- **CopilotKit** (UI + runtime endpoint)
+- **FullCalendar** (calendar UI)
+- **Tiptap** (meeting notes)
+- **Postgres + Drizzle ORM + migrations** (`packages/db`)
+- **Redis + BullMQ workers** (`apps/worker`)
+- **OpenAI official JS SDK** (server calls)
+- **LangGraph (JS)** for durable workflows + approvals
 
-- Node.js (see `package.json` engines if you add one)
-- pnpm 9
-- Postgres
-- Redis
+## Quickstart (local)
 
-## Environment
+### 1) Prereqs
 
-Copy the template and fill in required values:
+- Docker Desktop running
+- Node + pnpm installed
+
+### 2) Configure env
+
+Copy the example env and fill values:
 
 ```bash
+cd pa-os
 cp .env.example .env
 ```
 
-Required keys for core flows:
+**Minimum required** to boot:
 
-- `DATABASE_URL`
-- `REDIS_URL`
-- `APP_URL`
-- `TOKEN_ENC_KEY` (base64 32-byte key)
-- `LOCAL_ADMIN_PASSWORD`
+- `DATABASE_URL` (example: `postgres://paos:paos@localhost:5432/paos`)
+- `REDIS_URL` (example: `redis://localhost:6379`)
+- `APP_URL` (example: `http://localhost:3000`)
+- `TOKEN_ENC_KEY` (used for cookie session signing + encryption; use a long random secret)
+- `LOCAL_ADMIN_PASSWORD` (password for local login)
 
-Optional integrations:
+Optional feature env:
 
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
-- `OPENAI_API_KEY`, `OPENAI_REALTIME_MODEL`, `OPENAI_TRANSCRIPTION_MODEL`
-- `COPILOTKIT_PUBLIC_NAME`, `COPILOTKIT_AGENT_ROUTE`
+- **Copilot / agents / meeting scribe**: `OPENAI_API_KEY` (+ optional `OPENAI_MODEL`)
+- **Google Calendar**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
 
-## Install
+### 3) Start Postgres + Redis
 
 ```bash
-pnpm install
+pnpm docker:up
 ```
 
-## Database
+### 4) Run DB migrations
 
 ```bash
 pnpm db:migrate
-pnpm db:seed
 ```
 
-## Run (local)
+### 5) Start the app (web + worker)
 
 ```bash
 pnpm dev
 ```
 
-- Web app: `http://localhost:3000`
-- Worker runs via `turbo run dev --parallel` and starts automatically
+Visit `http://localhost:3000` and log in with `LOCAL_ADMIN_PASSWORD`.
 
-## Build
+> Login is **local-only** and will ensure a baseline seed dataset exists.
 
-```bash
-pnpm build
-```
+## Key flows to verify
 
-## Lint & typecheck
+- **Tasks**
+  - Open `/tasks` (company-scoped)
+- **Calendar**
+  - Open `/calendar`
+  - Connect Google Calendar (if configured) and run a sync
+- **Meetings → approvals**
+  - Create a meeting in `/calendar`
+  - Open it in `/meetings`
+  - Finalize a meeting (stores transcript + bookmarks + enqueues post-meeting processing)
+  - Ensure `apps/worker` is running so the post-meeting job executes
+  - Review approvals at `/approvals`
+- **Ask PA (CopilotKit)**
+  - Click **Ask PA** in the top bar
+  - The copilot is company-scoped and can call server tools (e.g. list/create tasks)
 
-```bash
-pnpm lint
-pnpm turbo run typecheck
-```
+## Repo layout
 
-## Key directories
-
-- `apps/web/app/(shell)`: primary app routes (tasks, calendar, meetings, approvals)
-- `apps/web/app/api`: server endpoints
-- `packages/db/src/schema.ts`: database schema
-- `apps/worker/src`: background processing
-
-## Checklists & QA
-
-See `ASSESSMENT_REPORT.md` for the acceptance checklist audit, evidence, gaps, and next steps.
+- `apps/web`: Next.js app (routes, UI, API routes)
+- `apps/worker`: BullMQ workers (calendar sync, meeting finalize, agent runs)
+- `packages/db`: Drizzle schema + migrations + seed/migrate scripts
+- `packages/agents`: LangGraph graphs + specialists (meeting prep, post-meeting)
+- `packages/ui`: shared shadcn/ui components + styling utilities

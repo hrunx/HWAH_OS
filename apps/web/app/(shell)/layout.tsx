@@ -31,7 +31,11 @@ export default async function ShellGroupLayout({ children }: { children: React.R
     rows.find((c) => c.id === session.companyId)?.id ?? rows[0]!.id;
 
   return (
-    <ShellLayout companies={rows} activeCompanyId={activeCompanyId}>
+    <ShellLayout
+      companies={rows}
+      activeCompanyId={activeCompanyId}
+      personId={session.personId}
+    >
       {children}
     </ShellLayout>
   );

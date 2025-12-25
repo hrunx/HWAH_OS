@@ -3,13 +3,13 @@ import { fileURLToPath } from "node:url";
 
 import dotenv from "dotenv";
 import { Worker } from "bullmq";
-import IORedis from "ioredis";
+import { Redis } from "ioredis";
 import pino from "pino";
 
-import { QUEUES } from "./queues";
-import { calendarSyncProcessor } from "./processors/calendarSync";
-import { meetingFinalizeProcessor } from "./processors/meetingFinalize";
-import { agentRunProcessor } from "./processors/agentRun";
+import { QUEUES } from "./queues.js";
+import { calendarSyncProcessor } from "./processors/calendarSync.js";
+import { meetingFinalizeProcessor } from "./processors/meetingFinalize.js";
+import { agentRunProcessor } from "./processors/agentRun.js";
 
 const logger = pino({ name: "pa-os-worker" });
 
@@ -22,7 +22,7 @@ if (!redisUrl) {
   throw new Error("REDIS_URL is required");
 }
 
-const connection = new IORedis(redisUrl, {
+const connection = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
 });
 
