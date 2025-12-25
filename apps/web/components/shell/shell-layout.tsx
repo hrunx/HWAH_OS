@@ -7,10 +7,11 @@ import { CalendarDays, CheckSquare, Home, Inbox, Settings, Users, ShieldCheck, M
 
 import { CopilotKit } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, cn } from "@pa-os/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Tabs, TabsContent, TabsList, TabsTrigger, cn } from "@pa-os/ui";
 
 import { CompanySwitcher, type CompanyOption } from "./company-switcher";
 import { ThemeToggle } from "./theme-toggle";
+import { PostMeetingRunner } from "@/components/coagents/post-meeting-runner";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: Home },
@@ -109,13 +110,24 @@ Rules:
             <DialogTitle>Ask CEO OS</DialogTitle>
             <DialogDescription>Company-scoped copilot (local-first).</DialogDescription>
           </DialogHeader>
-          <div className="h-[70vh]">
-            <CopilotChat
-              className="h-full"
-              instructions={copilotInstructions}
-              labels={{ title: "CEO OS", placeholder: "Ask about tasks, meetings, approvals…" }}
-            />
-          </div>
+          <Tabs defaultValue="chat" className="h-[70vh] flex flex-col">
+            <TabsList className="w-full justify-start">
+              <TabsTrigger value="chat">Chat</TabsTrigger>
+              <TabsTrigger value="post_meeting">Post-meeting agent</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="chat" className="flex-1 min-h-0 mt-3">
+              <CopilotChat
+                className="h-full"
+                instructions={copilotInstructions}
+                labels={{ title: "CEO OS", placeholder: "Ask about tasks, meetings, approvals…" }}
+              />
+            </TabsContent>
+
+            <TabsContent value="post_meeting" className="flex-1 min-h-0 mt-3 overflow-auto">
+              <PostMeetingRunner companyId={activeCompanyId} compact />
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </CopilotKit>
