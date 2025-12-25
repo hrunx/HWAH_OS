@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { and, eq, gte, ilike, lt, ne, or, sql } from "drizzle-orm";
+import { and, eq, gte, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
 import { agentRuns, approvals, calendarEvents, tasks } from "@pa-os/db/schema";
+import { runMeetingPrepGraph } from "@pa-os/agents";
 
 import { getSession } from "@/lib/auth/get-session";
 
@@ -52,50 +53,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Invalid payload" }, { status: 400 });
     }
 
-    const [event] = await db
-      .select({
-        id: calendarEvents.id,
-        title: calendarEvents.title,
-        startsAt: calendarEvents.startsAt,
-        endsAt: calendarEvents.endsAt,
-      })
-      .from(calendarEvents)
-      .where(and(eq(calendarEvents.id, p.data.calendarEventId), eq(calendarEvents.companyId, parsed.data.companyId)))
-      .limit(1);
+    try {
+      const output = await runMeetingPrepGraph({
+        companyId: parsed.data.companyId,
+        calendarEventId: p.data.calendarEventId,
+      });
 
-    if (!event) {
-      return NextResponse.json({ ok: false, error: "Calendar event not found" }, { status: 404 });
+      await db
+        .update(agentRuns)
+        .set({ status: "COMPLETED", outputJson: output as any, updatedAt: new Date() })
+        .where(eq(agentRuns.id, run.id));
+
+      return NextResponse.json({ ok: true, runId: run.id, output });
+    } catch (e: any) {
+      await db
+        .update(agentRuns)
+        .set({ status: "FAILED", outputJson: { error: String(e?.message ?? e) } as any, updatedAt: new Date() })
+        .where(eq(agentRuns.id, run.id));
+
+      return NextResponse.json({ ok: false, error: e?.message ?? "Prep pack failed" }, { status: 500 });
     }
-
-    const kw = event.title.split(/\s+/).slice(0, 4).join(" ").trim();
-    const related = kw
-      ? await db
-          .select({ id: tasks.id, title: tasks.title, status: tasks.status })
-          .from(tasks)
-          .where(
-            and(
-              eq(tasks.companyId, parsed.data.companyId),
-              or(ilike(tasks.title, `%${kw}%`), ilike(tasks.descriptionMd, `%${kw}%`))!,
-            ),
-          )
-          .limit(8)
-      : [];
-
-    const output = {
-      prep_pack: {
-        agenda: [`Review objectives for: ${event.title}`, "Key updates", "Decisions needed", "Next actions"],
-        outcomes: ["Aligned priorities", "Clear owners for actions", "Next meeting date (if needed)"],
-        risks: ["Unclear ownership", "Missing context in pre-reads"],
-        related_tasks: related.map((t) => ({ id: t.id, title: t.title, status: t.status })),
-      },
-    };
-
-    await db
-      .update(agentRuns)
-      .set({ status: "COMPLETED", outputJson: output, updatedAt: new Date() })
-      .where(eq(agentRuns.id, run.id));
-
-    return NextResponse.json({ ok: true, runId: run.id, output });
   }
 
   if (parsed.data.kind === "MEETING_POST") {

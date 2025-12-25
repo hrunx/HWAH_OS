@@ -2,6 +2,18 @@
 
 import * as React from "react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 
 import {
   Badge,
@@ -28,6 +40,7 @@ import {
   TabsList,
   TabsTrigger,
   Textarea,
+  cn,
 } from "@pa-os/ui";
 
 type Task = {
@@ -55,6 +68,62 @@ type Person = {
 const STATUSES: Task["status"][] = ["TODO", "IN_PROGRESS", "BLOCKED", "DONE"];
 const PRIORITIES: Task["priority"][] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
+function KanbanColumn({
+  status,
+  children,
+}: {
+  status: Task["status"];
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
+  return (
+    <Card
+      ref={setNodeRef}
+      className={cn("h-full transition-colors", isOver ? "ring-2 ring-primary/50" : undefined)}
+    >
+      {children}
+    </Card>
+  );
+}
+
+function DraggableTaskCard({
+  task,
+  onClick,
+}: {
+  task: Task;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `task:${task.id}`,
+    data: { taskId: task.id, fromStatus: task.status },
+  });
+
+  const style: React.CSSProperties = {
+    transform: transform ? CSS.Translate.toString(transform) : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "rounded-lg border p-3 bg-card cursor-grab active:cursor-grabbing",
+        isDragging ? "opacity-50" : undefined,
+      )}
+      {...listeners}
+      {...attributes}
+    >
+      <button className="text-left font-medium hover:underline" onClick={onClick}>
+        {task.title}
+      </button>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Badge variant="outline">{task.priority}</Badge>
+        <span className="truncate">Owner: {task.ownerName ?? "—"}</span>
+      </div>
+    </div>
+  );
+}
+
 function formatDue(dueAt: Task["dueAt"]) {
   if (!dueAt) return "—";
   const d = typeof dueAt === "string" ? new Date(dueAt) : dueAt;
@@ -75,6 +144,7 @@ export function TasksPageClient({ companyId }: { companyId: string }) {
 
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Task | null>(null);
+  const [activeDragTaskId, setActiveDragTaskId] = React.useState<string | null>(null);
 
   const [draft, setDraft] = React.useState({
     title: "",
@@ -236,6 +306,56 @@ export function TasksPageClient({ companyId }: { companyId: string }) {
     return g;
   }, [tasks]);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+  );
+
+  function findTask(taskId: string) {
+    return tasks.find((t) => t.id === taskId) ?? null;
+  }
+
+  function statusFromOverId(overId: string | number): Task["status"] | null {
+    const s = String(overId);
+    if (s.startsWith("col:")) {
+      const status = s.replace("col:", "") as Task["status"];
+      return STATUSES.includes(status) ? status : null;
+    }
+    if (s.startsWith("task:")) {
+      const taskId = s.replace("task:", "");
+      const t = findTask(taskId);
+      return t?.status ?? null;
+    }
+    return null;
+  }
+
+  function onDragStart(e: DragStartEvent) {
+    const id = String(e.active.id);
+    if (id.startsWith("task:")) {
+      setActiveDragTaskId(id.replace("task:", ""));
+    }
+  }
+
+  async function onDragEnd(e: DragEndEvent) {
+    const activeId = String(e.active.id);
+    const overId = e.over?.id;
+    setActiveDragTaskId(null);
+    if (!overId) return;
+
+    if (!activeId.startsWith("task:")) return;
+    const taskId = activeId.replace("task:", "");
+    const t = findTask(taskId);
+    if (!t) return;
+
+    const nextStatus = statusFromOverId(overId);
+    if (!nextStatus || nextStatus === t.status) return;
+
+    // Optimistic UI
+    setTasks((prev) => prev.map((x) => (x.id === taskId ? { ...x, status: nextStatus } : x)));
+    await quickUpdate(taskId, { status: nextStatus });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -377,52 +497,39 @@ export function TasksPageClient({ companyId }: { companyId: string }) {
           {loading ? (
             <div className="text-sm text-muted-foreground">Loading…</div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {STATUSES.map((status) => (
-                <Card key={status} className="h-full">
-                  <CardHeader>
-                    <CardTitle className="text-base">{status}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {grouped[status].length ? (
-                      grouped[status].map((t) => (
-                        <div key={t.id} className="rounded-lg border p-3 bg-card">
-                          <button
-                            className="text-left font-medium hover:underline"
-                            onClick={() => openEdit(t)}
-                          >
-                            {t.title}
-                          </button>
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <Badge variant="outline">{t.priority}</Badge>
-                            <span className="truncate">Owner: {t.ownerName ?? "—"}</span>
-                          </div>
-                          <div className="mt-2">
-                            <Select
-                              value={t.status}
-                              onValueChange={(v) => quickUpdate(t.id, { status: v })}
-                            >
-                              <SelectTrigger className="h-8">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {STATUSES.map((s) => (
-                                  <SelectItem key={s} value={s}>
-                                    {s}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-muted-foreground">No tasks.</div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+            >
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {STATUSES.map((status) => (
+                  <KanbanColumn key={status} status={status}>
+                    <CardHeader>
+                      <CardTitle className="text-base">{status}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 min-h-[120px]">
+                      {grouped[status].length ? (
+                        grouped[status].map((t) => (
+                          <DraggableTaskCard key={t.id} task={t} onClick={() => openEdit(t)} />
+                        ))
+                      ) : (
+                        <div className="text-sm text-muted-foreground">Drop tasks here.</div>
+                      )}
+                    </CardContent>
+                  </KanbanColumn>
+                ))}
+              </div>
+
+              <DragOverlay>
+                {activeDragTaskId ? (
+                  <div className="rounded-lg border p-3 bg-background shadow-lg w-[280px]">
+                    <div className="font-medium text-sm">{findTask(activeDragTaskId)?.title ?? "Task"}</div>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           )}
         </TabsContent>
       </Tabs>

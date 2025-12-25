@@ -103,7 +103,7 @@ export function CalendarPageClient({
       });
       const json = (await res.json().catch(() => null)) as any;
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Prep pack failed");
-      setPrepPack(JSON.stringify(json.output, null, 2));
+      setPrepPack(JSON.stringify((json.output as any)?.prep_pack ?? json.output, null, 2));
     } catch (e: any) {
       toast.error(e?.message ?? "Prep pack failed");
     } finally {

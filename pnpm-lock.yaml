@@ -7,6 +7,13 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@dnd-kit/core':
+        specifier: ^6.3.1
+        version: 6.3.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@dnd-kit/utilities':
+        specifier: ^3.2.2
+        version: 3.2.2(react@19.2.3)
     devDependencies:
       '@types/node':
         specifier: ^22.10.2
@@ -44,6 +51,12 @@ importers:
       '@copilotkit/runtime':
         specifier: 1.50.1
         version: 1.50.1(@anthropic-ai/sdk@0.9.1)(@cfworker/json-schema@4.1.1)(@langchain/community@0.0.57(ioredis@5.8.2)(openai@4.104.0(zod@3.25.76)))(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(zod@3.25.76)))(@langchain/langgraph-sdk@0.1.10(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(zod@3.25.76)))(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@langchain/openai@0.0.28)(@opentelemetry/api@1.9.0)(langchain@0.1.37(d3-dsv@3.0.1)(ignore@7.0.5)(ioredis@5.8.2)(openai@4.104.0(zod@3.25.76)))(openai@4.104.0(zod@3.25.76))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@dnd-kit/core':
+        specifier: ^6.3.1
+        version: 6.3.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@dnd-kit/utilities':
+        specifier: ^3.2.2
+        version: 3.2.2(react@19.2.3)
       '@fullcalendar/daygrid':
         specifier: ^6.1.15
         version: 6.1.20(@fullcalendar/core@6.1.20)
@@ -571,6 +584,22 @@ packages:
   '@copilotkitnext/web-inspector@0.0.33':
     resolution: {integrity: sha512-6XkkigbkhSkcFrzWEqiW6P98y9rCv4+Q/YGlvS9KNfeYOoyt1Z9Ug1VVy7BC6qIhytbrraJizo24g8v3nCWVqQ==}
     engines: {node: '>=18'}
+
+  '@dnd-kit/accessibility@3.1.1':
+    resolution: {integrity: sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw==}
+    peerDependencies:
+      react: '>=16.8.0'
+
+  '@dnd-kit/core@6.3.1':
+    resolution: {integrity: sha512-xkGBRQQab4RLwgXxoqETICr6S5JlogafbhNsidmrkVv2YRs5MLwpjoF2qpiGjQt8S9AoxtIV603s0GIUpY5eYQ==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
+  '@dnd-kit/utilities@3.2.2':
+    resolution: {integrity: sha512-+MKAJEOfaBe5SmV6t34p80MMKhjvUz0vRrvVJbPT0WElzaOJ/1xs+D+KDv+tD/NE5ujfrChEcshd4fLn0wpiqg==}
+    peerDependencies:
+      react: '>=16.8.0'
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
@@ -7066,6 +7095,24 @@ snapshots:
       lit: 3.3.2
       lucide: 0.525.0
       marked: 12.0.2
+
+  '@dnd-kit/accessibility@3.1.1(react@19.2.3)':
+    dependencies:
+      react: 19.2.3
+      tslib: 2.8.1
+
+  '@dnd-kit/core@6.3.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      '@dnd-kit/accessibility': 3.1.1(react@19.2.3)
+      '@dnd-kit/utilities': 3.2.2(react@19.2.3)
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+      tslib: 2.8.1
+
+  '@dnd-kit/utilities@3.2.2(react@19.2.3)':
+    dependencies:
+      react: 19.2.3
+      tslib: 2.8.1
 
   '@drizzle-team/brocli@0.10.2': {}
 
