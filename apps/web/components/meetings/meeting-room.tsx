@@ -24,6 +24,9 @@ function secondsSince(startedAtMs: number) {
 export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting: Meeting }) {
   const [listening, setListening] = React.useState(false);
   const [startedAtMs, setStartedAtMs] = React.useState<number | null>(null);
+  const [connectionState, setConnectionState] = React.useState<
+    "idle" | "connecting" | "connected" | "disconnected" | "failed"
+  >("idle");
 
   const [bookmarks, setBookmarks] = React.useState<Bookmark[]>([]);
   const [segments, setSegments] = React.useState<Segment[]>([]);
@@ -68,7 +71,12 @@ export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting
     const type = String(evt?.type ?? "");
 
     // Common delta streams
-    const delta = typeof evt?.delta === "string" ? evt.delta : null;
+    const delta =
+      typeof evt?.delta === "string"
+        ? evt.delta
+        : typeof evt?.transcript_delta === "string"
+          ? evt.transcript_delta
+          : null;
     const transcript =
       typeof evt?.transcript === "string"
         ? evt.transcript
@@ -76,13 +84,28 @@ export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting
           ? evt.text
           : null;
 
-    if (delta && (type.endsWith(".delta") || type.includes("transcript"))) {
+    // Known-ish types observed across Realtime payloads
+    const looksLikeDelta =
+      type.endsWith(".delta") ||
+      type === "response.audio_transcript.delta" ||
+      type === "response.audio_transcription.delta" ||
+      type.includes("transcript") ||
+      type.includes("transcription");
+
+    if (delta && looksLikeDelta) {
       appendPartial(delta);
       return;
     }
 
     // Common completion events
-    if (type.includes("completed") || type.endsWith(".done") || type.endsWith(".completed")) {
+    const looksLikeDone =
+      type.includes("completed") ||
+      type.endsWith(".done") ||
+      type.endsWith(".completed") ||
+      type === "response.audio_transcript.done" ||
+      type === "response.audio_transcription.done";
+
+    if (looksLikeDone) {
       const text = transcript ?? partialRef.current;
       if (text && text.trim()) commitSegment(text.trim());
       return;
@@ -91,6 +114,12 @@ export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting
     // Fallback: if it looks like a transcript payload, accept it
     if (transcript && (type.includes("transcript") || type.includes("transcription"))) {
       commitSegment(transcript.trim());
+    }
+
+    // Surface errors if present
+    if (type === "error" || type.endsWith(".error")) {
+      const msg = evt?.error?.message ?? evt?.message ?? "Realtime error";
+      toast.error(String(msg));
     }
   }
 
@@ -108,11 +137,13 @@ export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting
     pcRef.current = null;
     streamRef.current = null;
     setListening(false);
+    setConnectionState("idle");
   }
 
   async function startListening() {
     if (listening || connecting) return;
     setConnecting(true);
+    setConnectionState("connecting");
     try {
       if (!startedAtMs) setStartedAtMs(Date.now());
 
@@ -145,7 +176,11 @@ export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting
       pcRef.current = pc;
 
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+        const s = pc.connectionState;
+        if (s === "connected") setConnectionState("connected");
+        if (s === "disconnected") setConnectionState("disconnected");
+        if (s === "failed") setConnectionState("failed");
+        if (s === "failed" || s === "disconnected") {
           stopListening().catch(() => {});
         }
       };
@@ -210,6 +245,7 @@ export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting
       await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
 
       setListening(true);
+      setConnectionState("connected");
       toast.success("Realtime transcription started");
     } catch (e: any) {
       await stopListening();
@@ -295,6 +331,7 @@ export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting
               <Button variant="destructive" onClick={endMeeting} disabled={ending || (!fullText.trim() && !partial.trim())}>
                 {ending ? "Finalizing…" : "End Meeting"}
               </Button>
+              <span className="text-xs text-muted-foreground">RTC: {connectionState}</span>
             </div>
 
             <div className="rounded-lg border bg-card p-3">
