@@ -63,7 +63,7 @@ type Person = {
   fullName: string;
   email: string;
   title: string | null;
-  role: "OWNER" | "MEMBER";
+  role: "OWNER" | "ADMIN" | "MEMBER" | "GUEST";
 };
 
 const STATUSES: Task["status"][] = ["TODO", "IN_PROGRESS", "BLOCKED", "DONE"];
@@ -655,5 +655,4 @@ export function TasksPageClient({ companyId }: { companyId: string }) {
     </div>
   );
 }
-
 

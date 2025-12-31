@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, CheckSquare, Home, Inbox, Settings, Users, ShieldCheck, Mic, Workflow } from "lucide-react";
+import { CalendarDays, CheckSquare, Home, Inbox, Settings, Users, ShieldCheck, Mic, Workflow, ClipboardList } from "lucide-react";
 
 import { CopilotKit } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
@@ -21,6 +21,7 @@ const NAV = [
   { href: "/meetings", label: "Meetings", icon: Mic },
   { href: "/coagents", label: "CoAgents", icon: Workflow },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck },
+  { href: "/audit", label: "Audit Log", icon: ClipboardList },
   { href: "/people", label: "People", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -133,5 +134,4 @@ Rules:
     </CopilotKit>
   );
 }
-
 

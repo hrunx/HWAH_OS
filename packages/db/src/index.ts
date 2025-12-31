@@ -6,6 +6,7 @@ import * as schema from "./schema.js";
 
 export { schema };
 export { seedDb } from "./seed.js";
+export { recordAuditLog } from "./audit.js";
 
 export type DbClient = ReturnType<typeof createDb>;
 
@@ -35,6 +36,5 @@ export function getDb() {
   globalThis.__paosDb = created;
   return created;
 }
-
 
 

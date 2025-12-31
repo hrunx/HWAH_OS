@@ -22,7 +22,7 @@ type Person = {
   fullName: string;
   email: string;
   title: string | null;
-  role: "OWNER" | "MEMBER";
+  role: "OWNER" | "ADMIN" | "MEMBER" | "GUEST";
   companyName?: string | null;
 };
 
@@ -34,7 +34,7 @@ export function PeoplePageClient({ companyId }: { companyId: string }) {
   const [fullName, setFullName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [title, setTitle] = React.useState("");
-  const [role, setRole] = React.useState<"OWNER" | "MEMBER">("MEMBER");
+  const [role, setRole] = React.useState<"OWNER" | "ADMIN" | "MEMBER" | "GUEST">("MEMBER");
 
   async function load() {
     setLoading(true);
@@ -107,8 +107,10 @@ export function PeoplePageClient({ companyId }: { companyId: string }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="MEMBER">MEMBER</SelectItem>
                 <SelectItem value="OWNER">OWNER</SelectItem>
+                <SelectItem value="ADMIN">ADMIN</SelectItem>
+                <SelectItem value="MEMBER">MEMBER</SelectItem>
+                <SelectItem value="GUEST">GUEST</SelectItem>
               </SelectContent>
             </Select>
             <Button onClick={createPerson} disabled={isAll || !fullName.trim() || !email.trim()}>
@@ -147,5 +149,4 @@ export function PeoplePageClient({ companyId }: { companyId: string }) {
     </div>
   );
 }
-
 

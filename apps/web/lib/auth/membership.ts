@@ -10,4 +10,21 @@ export async function isCompanyMember(input: { personId: string; companyId: stri
   return Boolean(row);
 }
 
+const roleOrder = ["GUEST", "MEMBER", "ADMIN", "OWNER"] as const;
+type Role = (typeof roleOrder)[number];
+
+export async function hasCompanyRole(input: {
+  personId: string;
+  companyId: string;
+  minRole: Role;
+}) {
+  const { db } = getDb();
+  const row = await db.query.memberships.findFirst({
+    where: and(eq(memberships.personId, input.personId), eq(memberships.companyId, input.companyId)),
+  });
+  if (!row) return false;
+  const currentIndex = roleOrder.indexOf(row.role as Role);
+  const requiredIndex = roleOrder.indexOf(input.minRole);
+  return currentIndex >= requiredIndex;
+}
 

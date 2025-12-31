@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "@pa-os/db";
+import { getDb, recordAuditLog } from "@pa-os/db";
 import { tasks } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
@@ -69,7 +69,18 @@ export async function POST(req: Request) {
     .where(and(eq(tasks.id, parsed.data.taskId), eq(tasks.companyId, existing.companyId)))
     .returning();
 
+  if (updated?.id) {
+    await recordAuditLog({
+      companyId: updated.companyId,
+      actorType: "HUMAN",
+      actorPersonId: session.personId,
+      action: "TASK_UPDATE",
+      targetType: "task",
+      targetId: updated.id,
+      metadata: { fields: Object.keys(update) },
+    });
+  }
+
   return NextResponse.json({ ok: true, task: updated });
 }
-
 

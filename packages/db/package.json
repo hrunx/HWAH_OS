@@ -27,11 +27,12 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.25.0",
+    "@typescript-eslint/parser": "^8.25.0",
     "drizzle-kit": "^0.28.1",
     "eslint": "^9.17.0",
     "tsx": "^4.20.5",
     "typescript": "^5.7.2"
   }
 }
-
 

@@ -21,7 +21,7 @@ function secondsSince(startedAtMs: number) {
   return Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000));
 }
 
-export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting: Meeting }) {
+export function MeetingRoom({ meeting }: { meeting: Meeting }) {
   const [listening, setListening] = React.useState(false);
   const [startedAtMs, setStartedAtMs] = React.useState<number | null>(null);
   const [connectionState, setConnectionState] = React.useState<
@@ -383,5 +383,4 @@ export function MeetingRoom({ companyId, meeting }: { companyId: string; meeting
     </div>
   );
 }
-
 

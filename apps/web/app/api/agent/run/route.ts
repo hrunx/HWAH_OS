@@ -4,7 +4,7 @@ import { z } from "zod";
 import { and, eq, gte, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
 import { agentRuns, approvals, calendarEvents, tasks } from "@pa-os/db/schema";
-import { runMeetingPrepGraph } from "@pa-os/agents";
+import { runMeetingPrepGraph, runPostMeetingGraph } from "@pa-os/agents";
 
 import { getSession } from "@/lib/auth/get-session";
 
@@ -76,12 +76,34 @@ export async function POST(req: Request) {
   }
 
   if (parsed.data.kind === "MEETING_POST") {
-    const output = { error: "MEETING_POST not wired yet" };
-    await db
-      .update(agentRuns)
-      .set({ status: "FAILED", outputJson: output, updatedAt: new Date() })
-      .where(eq(agentRuns.id, run.id));
-    return NextResponse.json({ ok: false, error: "MEETING_POST not wired yet" }, { status: 501 });
+    const PayloadSchema = z.object({ meetingId: z.string().uuid() });
+    const p = PayloadSchema.safeParse(parsed.data.payload);
+    if (!p.success) {
+      return NextResponse.json({ ok: false, error: "Invalid payload" }, { status: 400 });
+    }
+
+    try {
+      const output = await runPostMeetingGraph({
+        threadId,
+        companyId: parsed.data.companyId,
+        meetingId: p.data.meetingId,
+        createdByPersonId: session.personId,
+        agentRunId: run.id,
+      });
+
+      await db
+        .update(agentRuns)
+        .set({ status: output.status === "WAITING_APPROVAL" ? "WAITING_APPROVAL" : "COMPLETED", outputJson: output as any, updatedAt: new Date() })
+        .where(eq(agentRuns.id, run.id));
+
+      return NextResponse.json({ ok: true, runId: run.id, output });
+    } catch (e: any) {
+      await db
+        .update(agentRuns)
+        .set({ status: "FAILED", outputJson: { error: String(e?.message ?? e) } as any, updatedAt: new Date() })
+        .where(eq(agentRuns.id, run.id));
+      return NextResponse.json({ ok: false, error: e?.message ?? "Post-meeting failed" }, { status: 500 });
+    }
   }
 
   const startOfToday = new Date(now);
@@ -139,5 +161,4 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, runId: run.id, output });
 }
-
 

@@ -1,9 +1,10 @@
 import OpenAI from "openai";
 import { copilotRuntimeNextJSAppRouterEndpoint, CopilotRuntime, OpenAIAdapter } from "@copilotkit/runtime";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, ilike, lt, or } from "drizzle-orm";
-import { getDb } from "@pa-os/db";
-import { calendarEvents, meetings, memberships, people, tasks } from "@pa-os/db/schema";
+import { getDb, recordAuditLog } from "@pa-os/db";
+import { agentRuns, approvals, calendarEvents, meetings, memberships, people, tasks } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
 
@@ -120,37 +121,88 @@ const copilotRuntime = new CopilotRuntime<any>({
           if (!existing) throw new Error("Task not found");
 
           const update: Record<string, unknown> = { updatedAt: new Date() };
+          const approvalPatch: Record<string, unknown> = {};
           if (patch && typeof patch === "object") {
             const p = patch as any;
-            if (typeof p.title === "string" && p.title.trim()) update.title = p.title.trim();
-            if (typeof p.descriptionMd === "string") update.descriptionMd = p.descriptionMd;
-            if (typeof p.status === "string") update.status = p.status;
-            if (typeof p.priority === "string") update.priority = p.priority;
-            if (p.ownerPersonId === null) update.ownerPersonId = null;
-            if (typeof p.ownerPersonId === "string") update.ownerPersonId = requireUuid(p.ownerPersonId, "ownerPersonId");
-            if (p.dueAt === null) update.dueAt = null;
+            if (typeof p.title === "string" && p.title.trim()) {
+              update.title = p.title.trim();
+              approvalPatch.title = p.title.trim();
+            }
+            if (typeof p.descriptionMd === "string") {
+              update.descriptionMd = p.descriptionMd;
+              approvalPatch.descriptionMd = p.descriptionMd;
+            }
+            if (typeof p.status === "string") {
+              update.status = p.status;
+              approvalPatch.status = p.status;
+            }
+            if (typeof p.priority === "string") {
+              update.priority = p.priority;
+              approvalPatch.priority = p.priority;
+            }
+            if (p.ownerPersonId === null) {
+              update.ownerPersonId = null;
+              approvalPatch.ownerPersonId = null;
+            }
+            if (typeof p.ownerPersonId === "string") {
+              const ownerId = requireUuid(p.ownerPersonId, "ownerPersonId");
+              update.ownerPersonId = ownerId;
+              approvalPatch.ownerPersonId = ownerId;
+            }
+            if (p.dueAt === null) {
+              update.dueAt = null;
+              approvalPatch.dueAt = null;
+            }
             if (typeof p.dueAt === "string") {
               const d = new Date(p.dueAt);
               if (Number.isNaN(d.getTime())) throw new Error("dueAt must be an ISO date string");
               update.dueAt = d;
+              approvalPatch.dueAt = d.toISOString();
             }
           }
 
-          const [row] = await db
-            .update(tasks)
-            .set(update)
-            .where(and(eq(tasks.id, idParsed), eq(tasks.companyId, companyIdParsed)))
-            .returning({
-              id: tasks.id,
-              title: tasks.title,
-              status: tasks.status,
-              priority: tasks.priority,
-              dueAt: tasks.dueAt,
-              ownerPersonId: tasks.ownerPersonId,
-              updatedAt: tasks.updatedAt,
-            });
+          const threadId = randomUUID();
+          const now = new Date();
+          const [run] = await db
+            .insert(agentRuns)
+            .values({
+              companyId: companyIdParsed,
+              kind: "COPILOT_ACTION",
+              status: "WAITING_APPROVAL",
+              threadId,
+              inputRefsJson: { source: "copilot", action: "updateTask" },
+              createdAt: now,
+              updatedAt: now,
+            })
+            .returning({ id: agentRuns.id });
+          if (!run) throw new Error("Failed to create agent run");
 
-          return { ok: true, task: row };
+          const payload = { updates: [{ taskId: idParsed, patch: approvalPatch }] };
+          const [approval] = await db
+            .insert(approvals)
+            .values({
+              companyId: companyIdParsed,
+              agentRunId: run.id,
+              type: "UPDATE_TASKS",
+              payloadJson: payload as any,
+              idempotencyKey: `${run.id}:UPDATE_TASKS`,
+              status: "PENDING",
+              createdAt: now,
+            })
+            .returning({ id: approvals.id });
+          if (!approval) throw new Error("Failed to create approval");
+
+          await recordAuditLog({
+            companyId: companyIdParsed,
+            actorType: "AGENT",
+            actorPersonId: personIdParsed,
+            action: "APPROVAL_CREATE",
+            targetType: "approval",
+            targetId: approval.id,
+            metadata: { type: "UPDATE_TASKS", taskId: idParsed },
+          });
+
+          return { ok: true, approvalId: approval.id, status: "PENDING_APPROVAL" };
         },
       },
       {
@@ -196,28 +248,59 @@ const copilotRuntime = new CopilotRuntime<any>({
             throw new Error("dueAt must be an ISO date string");
           }
 
-          const [row] = await db
-            .insert(tasks)
+          const threadId = randomUUID();
+          const [run] = await db
+            .insert(agentRuns)
             .values({
               companyId: companyIdParsed,
-              title,
-              descriptionMd: descriptionMd ?? "",
-              priority: (priority as any) ?? "MEDIUM",
-              status: (status as any) ?? "TODO",
-              dueAt: dueDate,
-              createdByPersonId: personIdParsed,
+              kind: "COPILOT_ACTION",
+              status: "WAITING_APPROVAL",
+              threadId,
+              inputRefsJson: { source: "copilot", action: "createTask" },
               createdAt: now,
               updatedAt: now,
             })
-            .returning({
-              id: tasks.id,
-              title: tasks.title,
-              status: tasks.status,
-              priority: tasks.priority,
-              dueAt: tasks.dueAt,
-            });
+            .returning({ id: agentRuns.id });
+          if (!run) throw new Error("Failed to create agent run");
 
-          return { ok: true, task: row };
+          const payload = {
+            tasks: [
+              {
+                title,
+                descriptionMd: descriptionMd ?? "",
+                priority: (priority as any) ?? "MEDIUM",
+                status: (status as any) ?? "TODO",
+                dueAt: dueDate ? dueDate.toISOString() : undefined,
+                ownerPersonId: personIdParsed,
+              },
+            ],
+          };
+
+          const [approval] = await db
+            .insert(approvals)
+            .values({
+              companyId: companyIdParsed,
+              agentRunId: run.id,
+              type: "CREATE_TASKS",
+              payloadJson: payload as any,
+              idempotencyKey: `${run.id}:CREATE_TASKS`,
+              status: "PENDING",
+              createdAt: now,
+            })
+            .returning({ id: approvals.id });
+          if (!approval) throw new Error("Failed to create approval");
+
+          await recordAuditLog({
+            companyId: companyIdParsed,
+            actorType: "AGENT",
+            actorPersonId: personIdParsed,
+            action: "APPROVAL_CREATE",
+            targetType: "approval",
+            targetId: approval.id,
+            metadata: { type: "CREATE_TASKS", taskCount: 1 },
+          });
+
+          return { ok: true, approvalId: approval.id, status: "PENDING_APPROVAL" };
         },
       },
       {
@@ -386,5 +469,3 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: e?.message ?? "CopilotKit error" }, { status: 500 });
   }
 }
-
-

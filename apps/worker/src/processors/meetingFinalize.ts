@@ -67,7 +67,7 @@ export async function meetingFinalizeProcessor(job: Job) {
         .update(agentRuns)
         .set({
           status: "WAITING_APPROVAL",
-          outputJson: result.interrupt as any,
+          outputJson: result.interrupt as unknown,
           updatedAt: new Date(),
         })
         .where(eq(agentRuns.id, run.id));
@@ -76,24 +76,27 @@ export async function meetingFinalizeProcessor(job: Job) {
       return;
     }
 
+      await db
+        .update(agentRuns)
+        .set({
+          status: "COMPLETED",
+          outputJson: result.result as unknown,
+          updatedAt: new Date(),
+        })
+        .where(eq(agentRuns.id, run.id));
+    await db.update(meetings).set({ state: "READY" }).where(eq(meetings.id, meetingId));
+    job.log("meetingFinalize completed");
+  } catch (e: unknown) {
     await db
       .update(agentRuns)
       .set({
-        status: "COMPLETED",
-        outputJson: result.result as any,
+        status: "FAILED",
+        outputJson: { error: String((e as { message?: string })?.message ?? e) } as unknown,
         updatedAt: new Date(),
       })
       .where(eq(agentRuns.id, run.id));
-    await db.update(meetings).set({ state: "READY" }).where(eq(meetings.id, meetingId));
-    job.log("meetingFinalize completed");
-  } catch (e: any) {
-    await db
-      .update(agentRuns)
-      .set({ status: "FAILED", outputJson: { error: String(e?.message ?? e) } as any, updatedAt: new Date() })
-      .where(eq(agentRuns.id, run.id));
-    job.log(`meetingFinalize failed: ${String(e?.message ?? e)}`);
+    job.log(`meetingFinalize failed: ${String((e as { message?: string })?.message ?? e)}`);
     throw e;
   }
 }
-
 

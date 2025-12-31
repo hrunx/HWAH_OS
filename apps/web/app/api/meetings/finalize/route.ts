@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
-import { getDb } from "@pa-os/db";
+import { eq } from "drizzle-orm";
+import { getDb, recordAuditLog } from "@pa-os/db";
 import { meetingAssets, meetings, transcripts } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
@@ -69,6 +69,16 @@ export async function POST(req: Request) {
     });
   });
 
+  await recordAuditLog({
+    companyId: meeting.companyId,
+    actorType: "HUMAN",
+    actorPersonId: session.personId,
+    action: "MEETING_FINALIZE",
+    targetType: "meeting",
+    targetId: meeting.id,
+    metadata: { transcriptLength: parsed.data.transcript.fullText.length },
+  });
+
   const queues = getQueues();
   await queues.meetingFinalize.add("finalize", {
     meetingId: meeting.id,
@@ -78,5 +88,3 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, enqueued: true });
 }
-
-

@@ -1,6 +1,6 @@
 import { Annotation, Command, END, interrupt, isGraphInterrupt, START, StateGraph } from "@langchain/langgraph";
 import { and, eq, desc } from "drizzle-orm";
-import { getDb } from "@pa-os/db";
+import { getDb, recordAuditLog } from "@pa-os/db";
 import { approvals, meetingAssets, meetingOutputs, meetings, tasks, transcripts } from "@pa-os/db/schema";
 
 import { meetingScribeGenerate, type MeetingBookmark } from "../specialists/meetingScribe.js";
@@ -102,6 +102,7 @@ export function getPostMeetingGraph() {
           agentRunId: state.agentRunId,
           type: "CREATE_TASKS",
           payloadJson: payload as any,
+          idempotencyKey: `${state.agentRunId}:CREATE_TASKS`,
           status: "PENDING",
           reviewerPersonId: null,
           reviewerFeedback: null,
@@ -111,6 +112,15 @@ export function getPostMeetingGraph() {
         .returning({ id: approvals.id });
 
       if (!approval) throw new Error("Failed to create approval");
+      await recordAuditLog({
+        companyId: state.companyId,
+        actorType: "AGENT",
+        actorPersonId: state.createdByPersonId,
+        action: "APPROVAL_CREATE",
+        targetType: "approval",
+        targetId: approval.id,
+        metadata: { type: "CREATE_TASKS", taskCount: payload.tasks?.length ?? 0 },
+      });
       return { approvalId: approval.id, approvalPayload: payload };
     })
     .addNode("interrupt_wait_for_approval", async (state) => {
@@ -137,6 +147,15 @@ export function getPostMeetingGraph() {
             decidedAt: now,
           })
           .where(eq(approvals.id, state.approvalId));
+        await recordAuditLog({
+          companyId: state.companyId,
+          actorType: "HUMAN",
+          actorPersonId: resume.reviewerPersonId ?? null,
+          action: "APPROVAL_DECIDE",
+          targetType: "approval",
+          targetId: state.approvalId,
+          metadata: { decision: "REJECT" },
+        });
         return {};
       }
 
@@ -144,7 +163,7 @@ export function getPostMeetingGraph() {
       const taskRows = payload.tasks ?? [];
 
       for (const t of taskRows) {
-        await db.insert(tasks).values({
+        const [created] = await db.insert(tasks).values({
           companyId: state.companyId,
           title: t.title,
           descriptionMd: t.descriptionMd ?? "",
@@ -156,7 +175,18 @@ export function getPostMeetingGraph() {
           createdByPersonId: state.createdByPersonId,
           createdAt: now,
           updatedAt: now,
-        });
+        }).returning({ id: tasks.id });
+        if (created?.id) {
+          await recordAuditLog({
+            companyId: state.companyId,
+            actorType: "AGENT",
+            actorPersonId: state.createdByPersonId,
+            action: "TASK_CREATE",
+            targetType: "task",
+            targetId: created.id,
+            metadata: { source: "MEETING", approvalId: state.approvalId },
+          });
+        }
       }
 
       await db
@@ -169,6 +199,15 @@ export function getPostMeetingGraph() {
           payloadJson: payload as any,
         })
         .where(eq(approvals.id, state.approvalId));
+      await recordAuditLog({
+        companyId: state.companyId,
+        actorType: "HUMAN",
+        actorPersonId: resume.reviewerPersonId ?? null,
+        action: "APPROVAL_DECIDE",
+        targetType: "approval",
+        targetId: state.approvalId,
+        metadata: { decision: "APPROVE", createdTasks: taskRows.length },
+      });
 
       return {};
     })
@@ -257,5 +296,3 @@ export async function resumePostMeetingGraph(input: {
   });
   return result;
 }
-
-
