@@ -1,0 +1,20 @@
+{
+  "commands": {
+    "lint_fast": "pnpm -s lint",
+    "test_fast": "pnpm -s test -- --runInBand",
+    "build_fast": "pnpm -s build"
+  },
+  "verification": {
+    "max_seconds": 25,
+    "tier_a": ["lint_fast", "test_fast"],
+    "tier_b_optional": []
+  },
+  "db": {
+    "type": "postgres",
+    "env_file": ".env",
+    "prod_url_env": "PROD_DATABASE_URL",
+    "write_phrase": "gotchubro",
+    "allow_ddl": false,
+    "max_rows_write": 5000
+  }
+}
