@@ -10,7 +10,12 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-export const membershipRoleEnum = pgEnum("membership_role", ["OWNER", "MEMBER"]);
+export const membershipRoleEnum = pgEnum("membership_role", [
+  "OWNER",
+  "ADMIN",
+  "MEMBER",
+  "GUEST",
+]);
 export const projectStatusEnum = pgEnum("project_status", ["ACTIVE", "ARCHIVED"]);
 export const taskStatusEnum = pgEnum("task_status", [
   "TODO",
@@ -46,8 +51,29 @@ export const agentRunKindEnum = pgEnum("agent_run_kind", [
   "MEETING_PREP",
   "MEETING_POST",
   "DAILY_BRIEF",
+  "COPILOT_ACTION",
 ]);
 export const approvalTypeEnum = pgEnum("approval_type", ["CREATE_TASKS", "UPDATE_TASKS"]);
+
+export const auditActorEnum = pgEnum("audit_actor", ["HUMAN", "AGENT", "SYSTEM"]);
+export const auditActionEnum = pgEnum("audit_action", [
+  "TASK_CREATE",
+  "TASK_UPDATE",
+  "TASK_DELETE",
+  "MEETING_FINALIZE",
+  "APPROVAL_CREATE",
+  "APPROVAL_DECIDE",
+  "CALENDAR_EVENT_CREATE",
+  "CALENDAR_EVENT_UPDATE",
+  "CALENDAR_EVENT_CANCEL",
+]);
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "MEETING_REMINDER",
+  "APPROVAL_PENDING",
+  "TASK_OVERDUE",
+  "DAILY_BRIEF",
+]);
 
 export const companies = pgTable(
   "companies",
@@ -331,6 +357,7 @@ export const approvals = pgTable(
     type: approvalTypeEnum("type").notNull(),
     payloadJson: jsonb("payload_json").notNull(),
     status: approvalStatusEnum("status").notNull().default("PENDING"),
+    idempotencyKey: text("idempotency_key"),
     reviewerPersonId: uuid("reviewer_person_id").references(() => people.id, {
       onDelete: "set null",
     }),
@@ -341,6 +368,53 @@ export const approvals = pgTable(
   (t) => [
     index("approvals_company_status_idx").on(t.companyId, t.status),
     index("approvals_agent_run_idx").on(t.agentRunId),
+    uniqueIndex("approvals_idempotency_key_uq").on(t.idempotencyKey),
+  ],
+);
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    actorType: auditActorEnum("actor_type").notNull(),
+    actorPersonId: uuid("actor_person_id").references(() => people.id, {
+      onDelete: "set null",
+    }),
+    action: auditActionEnum("action").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: uuid("target_id"),
+    metadataJson: jsonb("metadata_json").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("audit_logs_company_idx").on(t.companyId),
+    index("audit_logs_target_idx").on(t.targetType, t.targetId),
+  ],
+);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    type: notificationTypeEnum("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    payloadJson: jsonb("payload_json").notNull().default({}),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("notifications_company_idx").on(t.companyId),
+    index("notifications_person_idx").on(t.personId, t.readAt),
   ],
 );
 
@@ -365,11 +439,14 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   meetings: many(meetings),
   agentRuns: many(agentRuns),
   approvals: many(approvals),
+  auditLogs: many(auditLogs),
+  notifications: many(notifications),
 }));
 
 export const peopleRelations = relations(people, ({ many }) => ({
   memberships: many(memberships),
   ownedTasks: many(tasks, { relationName: "task_owner" }),
+  notifications: many(notifications),
 }));
 
 export const membershipsRelations = relations(memberships, ({ one }) => ({
@@ -449,4 +526,12 @@ export const approvalsRelations = relations(approvals, ({ one }) => ({
   reviewer: one(people, { fields: [approvals.reviewerPersonId], references: [people.id] }),
 }));
 
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  company: one(companies, { fields: [auditLogs.companyId], references: [companies.id] }),
+  actor: one(people, { fields: [auditLogs.actorPersonId], references: [people.id] }),
+}));
 
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  company: one(companies, { fields: [notifications.companyId], references: [companies.id] }),
+  person: one(people, { fields: [notifications.personId], references: [people.id] }),
+}));

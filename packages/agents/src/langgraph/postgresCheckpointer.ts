@@ -28,6 +28,32 @@ type StoredWritesRow = {
   writes: Array<[string, string, unknown]>; // [taskId, channel, value]
 };
 
+type CheckpointQueryRow = {
+  id?: string;
+  checkpointJson: unknown;
+  createdAt?: Date;
+};
+
+function isStoredCheckpointRow(value: unknown): value is StoredCheckpointRow {
+  if (!value || typeof value !== "object") return false;
+  const row = value as StoredCheckpointRow;
+  return (
+    row.type === "checkpoint" &&
+    typeof row.checkpointId === "string" &&
+    typeof row.checkpointNs === "string"
+  );
+}
+
+function isStoredWritesRow(value: unknown): value is StoredWritesRow {
+  if (!value || typeof value !== "object") return false;
+  const row = value as StoredWritesRow;
+  return (
+    row.type === "writes" &&
+    typeof row.checkpointId === "string" &&
+    typeof row.checkpointNs === "string"
+  );
+}
+
 export class PostgresCheckpointer extends BaseCheckpointSaver {
   async getTuple(config: RunnableConfig): Promise<CheckpointTuple | undefined> {
     const threadId = config.configurable?.thread_id;
@@ -52,8 +78,8 @@ export class PostgresCheckpointer extends BaseCheckpointSaver {
       .limit(200);
 
     const checkpointRows = checkpoints
-      .map((r) => r.checkpointJson as any)
-      .filter((r): r is StoredCheckpointRow => r?.type === "checkpoint" && typeof r?.checkpointId === "string");
+      .map((r: CheckpointQueryRow) => r.checkpointJson as unknown)
+      .filter(isStoredCheckpointRow);
 
     const selected =
       requestedCheckpointId
@@ -63,11 +89,13 @@ export class PostgresCheckpointer extends BaseCheckpointSaver {
     if (!selected) return undefined;
 
     const writesRows = checkpoints
-      .map((r) => r.checkpointJson as any)
-      .filter((r): r is StoredWritesRow => r?.type === "writes" && r?.checkpointId === selected.checkpointId)
-      .flatMap((r) => r.writes ?? []);
+      .map((r: CheckpointQueryRow) => r.checkpointJson as unknown)
+      .filter(
+        (r): r is StoredWritesRow =>
+          isStoredWritesRow(r) && r.checkpointId === selected.checkpointId,
+      );
 
-    const pendingWrites = writesRows as any;
+    const pendingWrites = writesRows.flatMap((row) => row.writes ?? []);
 
     const tuple: CheckpointTuple = {
       config: {
@@ -112,8 +140,8 @@ export class PostgresCheckpointer extends BaseCheckpointSaver {
       .limit(500);
 
     const checkpoints = rows
-      .map((r) => r.checkpointJson as any)
-      .filter((r): r is StoredCheckpointRow => r?.type === "checkpoint" && r?.checkpointNs === checkpointNs);
+      .map((r: CheckpointQueryRow) => r.checkpointJson as unknown)
+      .filter((r): r is StoredCheckpointRow => isStoredCheckpointRow(r) && r.checkpointNs === checkpointNs);
 
     for (const row of checkpoints.slice(0, limit)) {
       const tuple = await this.getTuple({
@@ -133,6 +161,7 @@ export class PostgresCheckpointer extends BaseCheckpointSaver {
     metadata: CheckpointMetadata,
     _newVersions: Record<string, string | number>,
   ): Promise<RunnableConfig> {
+    void _newVersions;
     const threadId = config.configurable?.thread_id;
     const checkpointNs = config.configurable?.checkpoint_ns ?? "";
     if (!threadId) {
@@ -198,5 +227,3 @@ export class PostgresCheckpointer extends BaseCheckpointSaver {
     await db.delete(lgCheckpoints).where(eq(lgCheckpoints.threadId, threadId));
   }
 }
-
-

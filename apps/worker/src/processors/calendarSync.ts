@@ -158,9 +158,13 @@ export async function calendarSyncProcessor(job: Job<CalendarSyncJob>) {
 
         if (!pageToken) break;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const status =
+        typeof err === "object" && err && "status" in err
+          ? (err as { status?: number }).status
+          : undefined;
       // If sync token is invalid, fall back to a full sync.
-      if (err?.status === 410 && syncToken) {
+      if (status === 410 && syncToken) {
         job.log(`syncToken invalid for calendarId=${calendarId}; clearing and retrying full sync`);
         syncToken = null;
         pageToken = undefined;
@@ -235,5 +239,4 @@ export async function calendarSyncProcessor(job: Job<CalendarSyncJob>) {
     job.log(`calendarSync done calendarId=${calendarId} hasNextSyncToken=${Boolean(nextSyncToken)}`);
   }
 }
-
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@pa-os/db";
 import { companies, memberships, people } from "@pa-os/db/schema";
 
@@ -67,5 +67,4 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ ok: true, people: rows });
 }
-
 

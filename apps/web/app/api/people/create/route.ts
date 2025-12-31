@@ -14,7 +14,7 @@ const BodySchema = z.object({
   fullName: z.string().min(1).max(200),
   email: z.string().email(),
   title: z.string().max(200).optional().nullable(),
-  role: z.enum(["OWNER", "MEMBER"]).optional().default("MEMBER"),
+  role: z.enum(["OWNER", "ADMIN", "MEMBER", "GUEST"]).optional().default("MEMBER"),
 });
 
 export async function POST(req: Request) {
@@ -84,5 +84,4 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, person: created });
 }
-
 

@@ -80,7 +80,11 @@ export async function seedDb() {
       });
   }
 
-  const membershipPairs: Array<{ companyId: string; personId: string; role: "OWNER" | "MEMBER" }> =
+  const membershipPairs: Array<{
+    companyId: string;
+    personId: string;
+    role: "OWNER" | "ADMIN" | "MEMBER" | "GUEST";
+  }> =
     [
       { companyId: hwah.id, personId: owner.id, role: "OWNER" },
       { companyId: gasable.id, personId: owner.id, role: "OWNER" },
@@ -193,5 +197,4 @@ if (isDirectRun) {
     process.exit(1);
   });
 }
-
 

@@ -80,9 +80,11 @@ export async function googleCalendarListEvents(input: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    const err = new Error(`Google events.list failed (${res.status}): ${text}`);
+    const err = new Error(`Google events.list failed (${res.status}): ${text}`) as Error & {
+      status?: number;
+    };
     // Attach status for handling 410 "Gone" (invalid sync token)
-    (err as any).status = res.status;
+    err.status = res.status;
     throw err;
   }
 
@@ -101,5 +103,4 @@ export async function googleCalendarListEvents(input: {
     nextSyncToken?: string;
   };
 }
-
 

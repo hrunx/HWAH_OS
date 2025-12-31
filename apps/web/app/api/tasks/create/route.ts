@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getDb } from "@pa-os/db";
+import { getDb, recordAuditLog } from "@pa-os/db";
 import { tasks } from "@pa-os/db/schema";
 
 import { getSession } from "@/lib/auth/get-session";
@@ -54,7 +54,18 @@ export async function POST(req: Request) {
     })
     .returning();
 
+  if (created?.id) {
+    await recordAuditLog({
+      companyId: created.companyId,
+      actorType: "HUMAN",
+      actorPersonId: session.personId,
+      action: "TASK_CREATE",
+      targetType: "task",
+      targetId: created.id,
+      metadata: { source: created.source },
+    });
+  }
+
   return NextResponse.json({ ok: true, task: created });
 }
-
 

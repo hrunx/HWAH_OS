@@ -29,7 +29,6 @@ export default async function MeetingDetailPage({ params }: { params: { id: stri
 
   return (
     <MeetingRoom
-      companyId={session.companyId}
       meeting={{
         id: meeting.id,
         title: meeting.title,
@@ -40,5 +39,4 @@ export default async function MeetingDetailPage({ params }: { params: { id: stri
     />
   );
 }
-
 
